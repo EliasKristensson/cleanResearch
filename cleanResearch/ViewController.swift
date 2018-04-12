@@ -8,70 +8,197 @@
 
 import UIKit
 import CloudKit
+import MobileCoreServices
 
 var mainVC: ViewController?
 
-class ViewController: UIViewController, UIDocumentPickerDelegate {
+struct File {
+    var filename: String
+//    var titles: [String]
+    var year: Int32
+//    var thumbnails: [UIImage]
+//    var sectionTitle: String
+//    var rank: [Int16]
+//    var notes: [String]
+//    var dateCreated: [Date]
+//    var dateModified: [Date]
+//    var currentItems: [Any]
+//    var currentItem: Int
+}
+
+class categoryCell: UICollectionViewCell {
+    
+    @IBOutlet weak var icon: UIImageView!
+    @IBOutlet weak var number: UILabel!
+    
+}
+
+class filesCell: UICollectionViewCell {
+    
+    @IBOutlet weak var thumbnail: UIImageView!
+    @IBOutlet weak var label: UILabel!
+}
+
+class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPresentationControllerDelegate, UIDocumentMenuDelegate, UICollectionViewDelegate, UICollectionViewDataSource {
+    
 
     // MARK: - Variables
+    var appDelegate: AppDelegate!
     var document: MyDocument?
+    let container = CKContainer.default
+    var privateDatabase: CKDatabase?
+    var currentRecord: CKRecord?
+    var recordZone: CKRecordZone?
     
-    var documentURL: URL?
-    var ubiquityURL: URL?
+//    let database = CKContainer.default().privateCloudDatabase
+//    var articles = [CKRecord]()
+    
+    var documentURL: URL!
+    var ubiquityURL: URL!
+    var kvStorage: NSUbiquitousKeyValueStore!
+    var publicationsURL: URL!
     var metaDataQuery: NSMetadataQuery?
     let documentInteractionController = UIDocumentInteractionController()
+    let categories: [String] = ["Publications", "Manuscripts", "Presentations", "Proposals", "Supervision", "Teaching", "Patents"]
+    var sortCollectionViewBox = CGSize(width: 348, height: 28)
+    var selectedCategoryNumber = 0
+    var selectedSubtableNumber = 0
+    var sortCollectionViewOption: [Int] = [0, 0, 0, 0, 0, 0, 0]
+    var sortCollectionViewOptions: [String] = [""]
+    var sortSubtableOptions: [String] = [""]
+    var sortSubtableOption: [Int] = [0, 0, 0, 0, 0, 0, 0]
+
+    var files = [File]()
+    var publications = [String]()
     
     // MARK: - Outlets
-    @IBOutlet weak var publicationIcon: UIButton!
-    @IBOutlet weak var publicationsNumber: UILabel!
-    @IBOutlet weak var manuscriptIcon: UIButton!
-    @IBOutlet weak var presentationIcon: UIButton!
-    @IBOutlet weak var proposalsIcon: UIButton!
-    @IBOutlet weak var supervisionIcon: UIButton!
-    @IBOutlet weak var teachingIcon: UIButton!
-    @IBOutlet weak var patentsIcon: UIButton!
     @IBOutlet weak var selectedCategoryTitle: UILabel!
-    @IBOutlet weak var selectedCategoryIcon: UIImageView!
+    @IBOutlet weak var categoriesCV: UICollectionView!
+    @IBOutlet weak var notesView: UIView!
+    @IBOutlet weak var segmentedControllTablesOrNotes: UISegmentedControl!
+    @IBOutlet weak var sortCVButton: UIButton!
+    @IBOutlet weak var sortSTButton: UIButton!
     
     @IBOutlet weak var textField: UITextView!
     
-    @IBAction func tappedSave(_ sender: Any) {
-        document?.updateChangeCount(.done)
+    
+    @IBAction func toggleTableNotes(_ sender: Any) {
+        let selectedOption = segmentedControllTablesOrNotes.titleForSegment(at: segmentedControllTablesOrNotes.selectedSegmentIndex)
+        switch selectedOption! {
+        case "List":
+            notesView.isHidden = true
+        case "Notes":
+            notesView.isHidden = false
+        default:
+            print("")
+        }
     }
+    
+    @IBAction func tappedLoad(_ sender: Any) {
+        let query = CKQuery(recordType: "Publications", predicate: NSPredicate(value: true))
+//        database.perform(query, inZoneWith: nil) { (records, error) in
+//            guard let records = records else {return}
+//            self.articles = records
+//            DispatchQueue.main.async {
+//                print(self.articles)
+//            }
+//        }
+        let query2 = CKQuery(recordType: "Authors", predicate: NSPredicate(value: true))
+//        database.perform(query2, inZoneWith: nil) { (records, error) in
+//            guard let records = records else {return}
+//            print(records)
+//            DispatchQueue.main.async {
+//            }
+//        }
 
-    // MARK: - Categories IBActions
-    @IBAction func publicationIconTapped(_ sender: Any) {
-        selectedCategoryIcon.center = publicationIcon.center
-        selectedCategoryTitle.text = "Publications"
-    }
-    @IBAction func manuscriptIconTapped(_ sender: Any) {
-        selectedCategoryIcon.center = manuscriptIcon.center
-        selectedCategoryTitle.text = "Manuscripts"
-    }
-    @IBAction func presentationIconTapped(_ sender: Any) {
-        selectedCategoryIcon.center = presentationIcon.center
-        selectedCategoryTitle.text = "Presentations"
-    }
-    @IBAction func proposalsIconTapped(_ sender: Any) {
-        selectedCategoryIcon.center = proposalsIcon.center
-        selectedCategoryTitle.text = "Proposals"
-    }
-    @IBAction func supervisionIconTapped(_ sender: Any) {
-        selectedCategoryIcon.center = supervisionIcon.center
-        selectedCategoryTitle.text = "Supervision"
-    }
-    @IBAction func teachingIconTapped(_ sender: Any) {
-        selectedCategoryIcon.center = teachingIcon.center
-        selectedCategoryTitle.text = "Teaching"
-    }
-    @IBAction func patentsIconTapped(_ sender: Any) {
-        selectedCategoryIcon.center = patentsIcon.center
-        selectedCategoryTitle.text = "Patents"
     }
     
+    @IBAction func tappedSave(_ sender: Any) {
+        
+        publications = [String]()
+        publications.append("test10.doc")
+        publications.append("test11.doc")
+        publications.append("test12.doc")
+
+        let tag = ["My papers", "All papers", "Spectroscopy"]
+        
+        if let zoneID = recordZone?.zoneID {
+            let myRecord = CKRecord(recordType: "Publication", zoneID: zoneID)
+            myRecord.setObject("FRAME - 2018" as CKRecordValue?, forKey: "Title")
+            myRecord.setObject("Kristensson" as CKRecordValue?, forKey: "Author")
+            myRecord.setObject(tag as CKRecordValue?, forKey: "Group")
+            myRecord.setObject(25 as CKRecordValue?, forKey: "Rank")
+            
+            let modifyRecordsOperation = CKModifyRecordsOperation(recordsToSave: [myRecord], recordIDsToDelete: nil)
+            let configuration = CKOperationConfiguration()
+            configuration.timeoutIntervalForRequest = 10
+            configuration.timeoutIntervalForResource = 10
+            
+            modifyRecordsOperation.configuration = configuration
+            modifyRecordsOperation.modifyRecordsCompletionBlock =
+                { records, recordIDs, error in
+                    if let err = error {
+                        print(err)
+                    } else {
+                        DispatchQueue.main.async {
+                            print("Record saved successfully")
+                        }
+                        self.currentRecord = myRecord
+                    }
+            }
+            privateDatabase?.add(modifyRecordsOperation)
+        }
+            
+    }
+    
+        
+//        let id = CKRecordID(recordName: "FRAME")
+//        let newPublication = CKRecord(recordType: "Publications")//, recordID: id)
+//        newPublication.setValue(publications, forKey: "test")
+//        database.save(newPublication) { (record, error) in
+//            print(error)
+//            guard record != nil else {return}
+//            print("Saved to icloud")
+//        }
+
+//        var authors = [String]()
+//        authors.append("John")
+//        authors.append("Elias")
+//        authors.append("Edouard")
+//
+//        let id = CKRecordID(recordName: "FRAME")
+//        let newPublication = CKRecord(recordType: "Authors", recordID: id)
+//        newPublication.setValue(publications, forKey: "Author")
+//        database.save(newPublication) { (record, error) in
+//            guard record != nil else {return}
+//            print("Saved to icloud")
+//        }
+//        newPublication.setObject(publications as NSArray, forKey: "content")
+        
+        
+        
+//        document?.updateChangeCount(.done)
+//    }
+
     @IBAction func importTapped(_ sender: Any) {
-    
+        let types: [String] = ["public.content"]
+        
+        let documentPicker : UIDocumentPickerViewController = UIDocumentPickerViewController.init(documentTypes: types, in: .import)
+        
+        documentPicker.delegate = self
+        documentPicker.modalPresentationStyle = UIModalPresentationStyle.popover
+        
+        if let popoverController = documentPicker.popoverPresentationController {
+            let viewForSource = sender as! UIView
+            popoverController.sourceView = viewForSource
+            popoverController.sourceRect = viewForSource.bounds // the position of the popover where it's showed
+            documentPicker.preferredContentSize = CGSize(width: 700, height: 700)
+            popoverController.delegate = self
+        }
+        present(documentPicker, animated: true, completion:nil)
     }
+    
+    
     
     
     
@@ -80,24 +207,49 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
         mainVC = self
-        document = MyDocument(fileURL: getURL())
-        document?.open(completionHandler: nil)
+//        document = MyDocument(fileURL: getURL())
+//        document?.open(completionHandler: nil)
+        
+        let app = UIApplication.shared
+        appDelegate = app.delegate as! AppDelegate
+        
+        categoriesCV.delegate = self
+        categoriesCV.dataSource = self
+        
+        
         setupUI()
+        
     }
     
     
+    
+    
+    func setupUI() {
+        publicationsURL = appDelegate.pubURL!
+        
+        privateDatabase = container().privateCloudDatabase
+        recordZone = CKRecordZone(zoneName: "PublicationZone")
+        
+        if let zone = recordZone {
+            privateDatabase?.save(zone, completionHandler: { (recordzone, error) in
+                if (error != nil) {
+                    print(error)
+                    print("Failed to create custom record zone")
+                } else {
+                    print("Saved record zone")
+                }
+            })
+        }
+        
+        kvStorage = NSUbiquitousKeyValueStore()
+        loadDefaultValues()
+        
+    }
+    
     func getURL() -> URL {
         let baseURL = FileManager.default.url(forUbiquityContainerIdentifier: nil)
-        let fullURL = baseURL?.appendingPathComponent("Documents/test.txt")
-        let tmp = baseURL?.appendingPathComponent("Documents", isDirectory: true)
-        let dirURL = tmp?.appendingPathComponent("Articles", isDirectory: true)
-        print(dirURL!)
-        do {
-            try FileManager.default.createDirectory(at: dirURL!, withIntermediateDirectories: false, attributes: nil)
-            print("Success")
-        } catch let error as NSError {
-            print(error.localizedDescription);
-        }
+//        let fullURL = baseURL?.appendingPathComponent("Documents/test.txt")
+        let fullURL = baseURL?.appendingPathComponent("Documents", isDirectory: true)
 
         return fullURL!
     }
@@ -118,8 +270,33 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
         metaDataQuery?.start()
         
     }
-
-    func setupUI() {
+    
+    func loadDefaultValues() {
+        if let numbers = kvStorage.array(forKey: "sortSubtable") as? [Int] {
+            sortSubtableOption = numbers
+        } else {
+            sortSubtableOption = [0, 0, 0, 0, 0, 0, 0]
+        }
+        if let numbers = kvStorage.array(forKey: "sortCollectionView") as? [Int] {
+            sortCollectionViewOption = numbers
+        } else {
+            sortCollectionViewOption = [0, 0, 0, 0, 0, 0, 0]
+        }
+//        if let number = kvStorage.array(forKey: "selectedCategory") as? Int {
+//            selectedCategoryNumber = number
+//        } else {
+//            selectedCategoryNumber = 0
+//        }
+//        kvStorage.longLong(forKey: "selectedSubtable")
+//        if let number = kvStorage.array(forKey: "selectedSubtable") as? Int {
+//            selectedSubtableNumber = number
+//        } else {
+//            selectedSubtableNumber = 0
+//        }
+//        let indexPath = IndexPath(row: selectedSubtableNumber, section: 0)
+//        categoriesCV.selectItem(at: indexPath, animated: false, scrollPosition: .top)
+//        selectedCategoryTitle.text = categories[selectedSubtableNumber]
+        
     }
     
     @objc func metadataQueryDidFinishGathering(notification: NSNotification) -> Void {
@@ -204,10 +381,131 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
         
     }
     
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        for url in urls {
+            downloadFile(fileURL: url)
+        }
+    }
+    
+    func downloadFile(fileURL: URL) {
+        
+        print(fileURL)
+        var newFileURL: URL!
+        
+        URLSession.shared.dataTask(with: fileURL) { data, response, error in
+            guard let data = data, error == nil else {return}
+            
+            newFileURL = self.publicationsURL.appendingPathComponent(fileURL.lastPathComponent)
+            // write temporary file to disk/icloud folder
+            do {
+                try data.write(to: newFileURL)
+                print("success")
+            } catch {
+                print(error)
+            }
+            
+            DispatchQueue.main.async {
+                self.documentInteractionController.url = newFileURL
+                self.documentInteractionController.uti = fileURL.typeIdentifier ?? "public.data, public.content"
+                self.documentInteractionController.name = fileURL.localizedName ?? fileURL.lastPathComponent
+                self.documentInteractionController.presentOptionsMenu(from: self.view.frame, in: self.view, animated: true)
+            }
+            }.resume()
+    }
+
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        if (segue.identifier == "segueSortCV") {
+            sortCollectionViewOptions = ["Filename", "Title", "Year", "Author", "Modified", "Rank"]
+            let destination = segue.destination as! SortItemsViewController
+            if sortCollectionViewOption[selectedCategoryNumber] > sortCollectionViewOptions.count {
+                sortCollectionViewOption[selectedCategoryNumber] = 0
+            }
+            destination.sortCollectionViewValue = sortCollectionViewOption[selectedCategoryNumber]
+            destination.sortCollectionViewStrings = sortCollectionViewOptions
+            destination.preferredContentSize = sortCollectionViewBox
+            destination.popoverPresentationController?.sourceRect = sortCVButton.bounds
+        }
+        if (segue.identifier == "segueSortSubtable") {
+            sortSubtableOptions = ["Tag", "Year", "Author", "Modified"]
+            let destination = segue.destination as! SortSubtableViewController
+            if sortSubtableOption[selectedSubtableNumber] > sortSubtableOptions.count {
+                sortSubtableOption[selectedSubtableNumber] = 0
+            }
+            destination.sortValue = 0//sortSubtableOption[selectedSubtableNumber]
+            destination.sortStrings = sortSubtableOptions
+            destination.preferredContentSize = sortCollectionViewBox
+            destination.popoverPresentationController?.sourceRect = sortSTButton.bounds
+        }
+    }
+    
+    public func documentMenu(_ documentMenu: UIDocumentMenuViewController, didPickDocumentPicker documentPicker: UIDocumentPickerViewController) {
+        
+    }
+    
+    
+    // MARK: - Collection View
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        if collectionView == self.categoriesCV {
+            return 7
+        } else {
+            return 1
+        }
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        if collectionView == self.categoriesCV {
+            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "categoryCell", for: indexPath) as! categoryCell
+            switch categories[indexPath.row] {
+            case "Publications":
+                cell.icon.image = #imageLiteral(resourceName: "PublicationsIcon")
+                cell.icon.highlightedImage = #imageLiteral(resourceName: "PublicationsIconSelected")
+                cell.number.text = "0"
+            case "Manuscripts":
+                cell.icon.image = #imageLiteral(resourceName: "ManuscriptsIcon")
+                cell.icon.highlightedImage = #imageLiteral(resourceName: "ManuscriptsIconSelected")
+                cell.number.text = "10"
+            case "Patents":
+                cell.icon.image = #imageLiteral(resourceName: "PatentsIcon")
+                cell.icon.highlightedImage = #imageLiteral(resourceName: "PatentsIconSelected")
+                cell.number.text = "30"
+            case "Proposals":
+                cell.icon.image = #imageLiteral(resourceName: "ProposalsIcon")
+                cell.icon.highlightedImage = #imageLiteral(resourceName: "ProposalsIconSelected")
+                cell.number.text = "3"
+            case "Presentations":
+                cell.icon.image = #imageLiteral(resourceName: "PresentationsIcon")
+                cell.icon.highlightedImage = #imageLiteral(resourceName: "PresentationsIconSelected")
+                cell.number.text = "4"
+            case "Teaching":
+                cell.icon.image = #imageLiteral(resourceName: "TeachingIcon")
+                cell.icon.highlightedImage = #imageLiteral(resourceName: "TeachingIconSelected")
+                cell.number.text = "4"
+            case "Supervision":
+                cell.icon.image = #imageLiteral(resourceName: "SupervisionIcon")
+                cell.icon.highlightedImage = #imageLiteral(resourceName: "SupervisionIconSelected")
+                cell.number.text = "54"
+            default:
+                cell.icon.image = #imageLiteral(resourceName: "PublicationsIcon")
+                cell.icon.highlightedImage = #imageLiteral(resourceName: "PublicationsIconSelected")
+                cell.number.text = "0"
+            }
+            return cell
+        } else {
+            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "filesCell", for: indexPath) as! filesCell
+            return cell
+        }
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        selectedCategoryTitle.text = categories[indexPath.row]
+        selectedCategoryNumber = indexPath.row
+        kvStorage.set(selectedCategoryNumber, forKey: "selectedCategory")
+        kvStorage.synchronize()
+
+    }
+    
     
 
-    
-    
     
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
@@ -217,6 +515,28 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
 
 }
 
+
+extension UISegmentedControl {
+    func replaceSegments(segments: Array<String>) {
+        self.removeAllSegments()
+        for segment in segments {
+            self.insertSegment(withTitle: segment, at: self.numberOfSegments, animated: false)
+        }
+    }
+}
+
+extension URL {
+    var typeIdentifier: String? {
+        return (try? resourceValues(forKeys: [.typeIdentifierKey]))?.typeIdentifier
+    }
+    var localizedName: String? {
+        return (try? resourceValues(forKeys: [.localizedNameKey]))?.localizedName
+    }
+}
+
+
+
+// MARK: - IBDesignables
 @IBDesignable extension UILabel {
     
     @IBInspectable var borderWidth: CGFloat {
@@ -250,3 +570,35 @@ class ViewController: UIViewController, UIDocumentPickerDelegate {
     }
 }
 
+@IBDesignable extension UIButton {
+    
+    @IBInspectable var borderWidth: CGFloat {
+        set {
+            layer.borderWidth = newValue
+        }
+        get {
+            return layer.borderWidth
+        }
+    }
+    
+    @IBInspectable var cornerRadius: CGFloat {
+        set {
+//            layer.masksToBounds = true
+            layer.cornerRadius = newValue
+        }
+        get {
+            return layer.cornerRadius
+        }
+    }
+    
+    @IBInspectable var borderColor: UIColor? {
+        set {
+            guard let uiColor = newValue else { return }
+            layer.borderColor = uiColor.cgColor
+        }
+        get {
+            guard let color = layer.borderColor else { return nil }
+            return UIColor(cgColor: color)
+        }
+    }
+}

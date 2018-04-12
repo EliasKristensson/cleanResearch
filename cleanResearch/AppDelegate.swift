@@ -12,11 +12,71 @@ import CoreData
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
+    var container: NSPersistentContainer!
+    var context: NSManagedObjectContext!
+
     var window: UIWindow?
-
-
+    var iCloudURL: URL?
+    var docURL: URL?
+    var localURL: URL?
+    var pubURL: URL?
+    var manuscriptURL: URL?
+    var presentationURL: URL?
+    var proposalsURL: URL?
+    var supervisionURL: URL?
+    var teachingURL: URL?
+    var patentsURL: URL?
+    
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplicationLaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
+        
+        localURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+        iCloudURL = FileManager.default.url(forUbiquityContainerIdentifier: nil)
+        docURL = iCloudURL?.appendingPathComponent("Documents", isDirectory: true)
+        
+        pubURL = docURL?.appendingPathComponent("Publications", isDirectory: true)
+        manuscriptURL = docURL?.appendingPathComponent("Manuscript", isDirectory: true)
+        presentationURL = docURL?.appendingPathComponent("Presentations", isDirectory: true)
+        proposalsURL = docURL?.appendingPathComponent("Proposals", isDirectory: true)
+        supervisionURL = docURL?.appendingPathComponent("Supervision", isDirectory: true)
+        teachingURL = docURL?.appendingPathComponent("Teaching", isDirectory: true)
+        patentsURL = docURL?.appendingPathComponent("Patents", isDirectory: true)
+        
+        do {
+            try FileManager.default.createDirectory(at: pubURL!, withIntermediateDirectories: false, attributes: nil)
+        } catch let error as NSError {
+            print(error.localizedDescription);
+        }
+        do {
+            try FileManager.default.createDirectory(at: manuscriptURL!, withIntermediateDirectories: false, attributes: nil)
+        } catch let error as NSError {
+            print(error.localizedDescription);
+        }
+        do {
+            try FileManager.default.createDirectory(at: presentationURL!, withIntermediateDirectories: false, attributes: nil)
+        } catch let error as NSError {
+            print(error.localizedDescription);
+        }
+        do {
+            try FileManager.default.createDirectory(at: proposalsURL!, withIntermediateDirectories: false, attributes: nil)
+        } catch let error as NSError {
+            print(error.localizedDescription);
+        }
+        do {
+            try FileManager.default.createDirectory(at: supervisionURL!, withIntermediateDirectories: false, attributes: nil)
+        } catch let error as NSError {
+            print(error.localizedDescription);
+        }
+        do {
+            try FileManager.default.createDirectory(at: teachingURL!, withIntermediateDirectories: false, attributes: nil)
+        } catch let error as NSError {
+            print(error.localizedDescription);
+        }
+        do {
+            try FileManager.default.createDirectory(at: patentsURL!, withIntermediateDirectories: false, attributes: nil)
+        } catch let error as NSError {
+            print(error.localizedDescription);
+        }
         return true
     }
 
@@ -56,17 +116,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         let container = NSPersistentContainer(name: "cleanResearch")
         container.loadPersistentStores(completionHandler: { (storeDescription, error) in
             if let error = error as NSError? {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-                 
-                /*
-                 Typical reasons for an error here include:
-                 * The parent directory does not exist, cannot be created, or disallows writing.
-                 * The persistent store is not accessible, due to permissions or data protection when the device is locked.
-                 * The device is out of space.
-                 * The store could not be migrated to the current model version.
-                 Check the error message to determine what the actual problem was.
-                 */
                 fatalError("Unresolved error \(error), \(error.userInfo)")
             }
         })
@@ -91,3 +140,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 }
 
+
+// Replace this implementation with code to handle the error appropriately.
+// fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
+
+/*
+ Typical reasons for an error here include:
+ * The parent directory does not exist, cannot be created, or disallows writing.
+ * The persistent store is not accessible, due to permissions or data protection when the device is locked.
+ * The device is out of space.
+ * The store could not be migrated to the current model version.
+ Check the error message to determine what the actual problem was.
+ */
