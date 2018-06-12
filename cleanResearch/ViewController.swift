@@ -8,6 +8,7 @@
 
 import UIKit
 import CloudKit
+import PDFKit
 import MobileCoreServices
 
 var mainVC: ViewController?
@@ -30,13 +31,14 @@ class categoryCell: UICollectionViewCell {
     
     @IBOutlet weak var icon: UIImageView!
     @IBOutlet weak var number: UILabel!
-    
+    var favoriteButton: UIButton!
 }
 
 class filesCell: UICollectionViewCell {
     
     @IBOutlet weak var thumbnail: UIImageView!
     @IBOutlet weak var label: UILabel!
+    
 }
 
 class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPresentationControllerDelegate, UIDocumentMenuDelegate, UICollectionViewDelegate, UICollectionViewDataSource {
@@ -49,11 +51,16 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     var privateDatabase: CKDatabase?
     var currentRecord: CKRecord?
     var recordZone: CKRecordZone?
+    var recordID: CKRecordID?
+    
+    @IBOutlet weak var filesCollectionView: UICollectionView!
+    
     
 //    let database = CKContainer.default().privateCloudDatabase
 //    var articles = [CKRecord]()
     
     var documentURL: URL!
+    var documentPage = 0
     var ubiquityURL: URL!
     var kvStorage: NSUbiquitousKeyValueStore!
     var publicationsURL: URL!
@@ -71,6 +78,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     var files = [File]()
     var publications = [String]()
     
+    var PDFdocument: PDFDocument!
+    var PDFfilename: String!
+    
     // MARK: - Outlets
     @IBOutlet weak var selectedCategoryTitle: UILabel!
     @IBOutlet weak var categoriesCV: UICollectionView!
@@ -79,8 +89,21 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     @IBOutlet weak var sortCVButton: UIButton!
     @IBOutlet weak var sortSTButton: UIButton!
     
+    @IBOutlet weak var largeThumbnail: UIImageView!
+    @IBOutlet weak var filenameString: UITextField!
+    @IBOutlet weak var titleString: UITextField!
+    @IBOutlet weak var notesTextView: UITextView!
+    @IBOutlet weak var authorString: UITextField!
+    @IBOutlet weak var yearString: UITextField!
+    @IBOutlet weak var rankValue: UILabel!
+    @IBOutlet weak var rankOutlet: UISlider!
+    
+    
     @IBOutlet weak var textField: UITextView!
     
+    @IBAction func favoriteTapped(_ sender: Any) {
+//        let pointInCollectionView =  //gesture.location(in: self.filesCollectionView)
+    }
     
     @IBAction func toggleTableNotes(_ sender: Any) {
         let selectedOption = segmentedControllTablesOrNotes.titleForSegment(at: segmentedControllTablesOrNotes.selectedSegmentIndex)
@@ -94,61 +117,113 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         }
     }
     
-    @IBAction func tappedLoad(_ sender: Any) {
-        let query = CKQuery(recordType: "Publications", predicate: NSPredicate(value: true))
-//        database.perform(query, inZoneWith: nil) { (records, error) in
-//            guard let records = records else {return}
-//            self.articles = records
-//            DispatchQueue.main.async {
-//                print(self.articles)
-//            }
-//        }
-        let query2 = CKQuery(recordType: "Authors", predicate: NSPredicate(value: true))
-//        database.perform(query2, inZoneWith: nil) { (records, error) in
-//            guard let records = records else {return}
-//            print(records)
-//            DispatchQueue.main.async {
-//            }
-//        }
+    @IBAction func rankSlider(_ sender: Any) {
+        rankValue.text = "\(Int(rankOutlet.value))"
+    }
+    
+    @IBAction func updateFile(_ sender: Any) {
+        
+    }
+    
+    @IBAction func deleteFile(_ sender: Any) {
+        
+    }
+    
+    @IBAction func nextPDFPage(_ sender: Any) {
+        
+        let document = PDFDocument(url: documentURL)
+        let pageCount = document?.pageCount
+        let page: PDFPage!
+        documentPage = documentPage + 1
+        if documentPage >= pageCount! {
+            documentPage = pageCount! - 1
+        }
+        page = document?.page(at: documentPage)!
+        let pageThumbnail = page.thumbnail(of: CGSize(width: 210, height: 297), for: .artBox)
+
+        largeThumbnail.image = pageThumbnail
+    }
+    
+    @IBAction func prevPDFPage(_ sender: Any) {
+        let document = PDFDocument(url: documentURL)
+        let page: PDFPage!
+        documentPage = documentPage - 1
+        if documentPage < 0 {
+            documentPage = 0
+        }
+        page = document?.page(at: documentPage)!
+        let pageThumbnail = page.thumbnail(of: CGSize(width: 210, height: 297), for: .artBox)
+        
+        largeThumbnail.image = pageThumbnail
 
     }
     
-    @IBAction func tappedSave(_ sender: Any) {
-        
-        publications = [String]()
-        publications.append("test10.doc")
-        publications.append("test11.doc")
-        publications.append("test12.doc")
-
-        let tag = ["My papers", "All papers", "Spectroscopy"]
-        
-        if let zoneID = recordZone?.zoneID {
-            let myRecord = CKRecord(recordType: "Publication", zoneID: zoneID)
-            myRecord.setObject("FRAME - 2018" as CKRecordValue?, forKey: "Title")
-            myRecord.setObject("Kristensson" as CKRecordValue?, forKey: "Author")
-            myRecord.setObject(tag as CKRecordValue?, forKey: "Group")
-            myRecord.setObject(25 as CKRecordValue?, forKey: "Rank")
-            
-            let modifyRecordsOperation = CKModifyRecordsOperation(recordsToSave: [myRecord], recordIDsToDelete: nil)
-            let configuration = CKOperationConfiguration()
-            configuration.timeoutIntervalForRequest = 10
-            configuration.timeoutIntervalForResource = 10
-            
-            modifyRecordsOperation.configuration = configuration
-            modifyRecordsOperation.modifyRecordsCompletionBlock =
-                { records, recordIDs, error in
-                    if let err = error {
-                        print(err)
-                    } else {
-                        DispatchQueue.main.async {
-                            print("Record saved successfully")
-                        }
-                        self.currentRecord = myRecord
-                    }
+    
+    @IBAction func tappedLoad(_ sender: Any) {
+        let query = CKQuery(recordType: "Publication", predicate: NSPredicate(value: true))
+        privateDatabase?.perform(query, inZoneWith: nil) { (records, error) in
+            guard let records = records else {return}
+            let record = records[0]
+            DispatchQueue.main.async {
+                let thumbnail = record.object(forKey: "Thumbnail") as! CKAsset
+                self.largeThumbnail.image = UIImage(contentsOfFile: thumbnail.fileURL.path)
             }
-            privateDatabase?.add(modifyRecordsOperation)
         }
-            
+        
+    }
+    
+    @IBAction func tappedSave(_ sender: Any) {
+
+        if let id = self.recordID {
+            let record = CKRecord(recordType: "Publication", recordID: id)
+            record.setObject("SLIPI - 2018" as CKRecordValue?, forKey: "Title")
+            privateDatabase?.save(record, completionHandler: { (returnRecord, error) in
+                if let err = error {
+                    DispatchQueue.main.async {
+                        print(err)
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        print("Success")
+                    }
+                }
+            })
+        }
+
+//        publications = [String]()
+//        publications.append("test10.doc")
+//        publications.append("test11.doc")
+//        publications.append("test12.doc")
+//
+//        let tag = ["My papers", "All papers", "Spectroscopy"]
+//
+//        if let zoneID = recordZone?.zoneID {
+//            let myRecord = CKRecord(recordType: "Publication", zoneID: zoneID)
+//            myRecord.setObject("FRAME - 2018" as CKRecordValue?, forKey: "Title")
+//            myRecord.setObject("Kristensson" as CKRecordValue?, forKey: "Author")
+//            myRecord.setObject(tag as CKRecordValue?, forKey: "Group")
+//            myRecord.setObject(25 as CKRecordValue?, forKey: "Rank")
+//
+//            let modifyRecordsOperation = CKModifyRecordsOperation(recordsToSave: [myRecord], recordIDsToDelete: nil)
+//            let configuration = CKOperationConfiguration()
+//            configuration.timeoutIntervalForRequest = 10
+//            configuration.timeoutIntervalForResource = 10
+//
+//            modifyRecordsOperation.configuration = configuration
+//            modifyRecordsOperation.modifyRecordsCompletionBlock =
+//                { records, recordIDs, error in
+//                    if let err = error {
+//                        print(err)
+//                    } else {
+//                        DispatchQueue.main.async {
+//                            print("Record saved successfully")
+//                        }
+//                        self.currentRecord = myRecord
+//                    }
+//            }
+//            privateDatabase?.add(modifyRecordsOperation)
+//        }
+        
     }
     
         
@@ -216,7 +291,6 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         categoriesCV.delegate = self
         categoriesCV.dataSource = self
         
-        
         setupUI()
         
     }
@@ -233,7 +307,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         if let zone = recordZone {
             privateDatabase?.save(zone, completionHandler: { (recordzone, error) in
                 if (error != nil) {
-                    print(error)
+                    print(error!)
                     print("Failed to create custom record zone")
                 } else {
                     print("Saved record zone")
@@ -243,6 +317,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         
         kvStorage = NSUbiquitousKeyValueStore()
         loadDefaultValues()
+        
+        navigationController?.isNavigationBarHidden = true
+        self.notesView.isHidden = true
         
     }
     
@@ -334,7 +411,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     func copyDocumentsToiCloudDrive() {
         var error: NSError?
         let iCloudDocumentsURL = FileManager.default.url(forUbiquityContainerIdentifier: nil)?.appendingPathComponent("Documents/myCloudTest")
-        print(iCloudDocumentsURL)
+        print(iCloudDocumentsURL!)
         do{
             //is iCloud working?
             if  iCloudDocumentsURL != nil {
@@ -383,10 +460,32 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
         for url in urls {
+            documentURL = url
+            let thumbnail = getThumbnail(url: url)
+            largeThumbnail.image = thumbnail
+            documentPage = 0
+            filenameString.text = url.lastPathComponent
+            titleString.text = "Not specified"
+            yearString.text = "-2000"
+            authorString.text = "No author"
+            PDFdocument = PDFDocument(url: url)
+            print(url.lastPathComponent)
+            
+//            performSegue(withIdentifier: "seguePDFViewController", sender: self)
+            
+            saveToIcloud(url: url)
             downloadFile(fileURL: url)
         }
     }
     
+    func isStringAnInt(stringNumber: String) -> Int {
+        if let tmpValue = Int(stringNumber) {
+            return tmpValue
+        }
+        print("String number could not be converted")
+        return -2000
+    }
+
     func downloadFile(fileURL: URL) {
         
         print(fileURL)
@@ -395,11 +494,17 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         URLSession.shared.dataTask(with: fileURL) { data, response, error in
             guard let data = data, error == nil else {return}
             
-            newFileURL = self.publicationsURL.appendingPathComponent(fileURL.lastPathComponent)
+            switch self.categories[self.selectedCategoryNumber] {
+            case "Publications":
+                newFileURL = self.publicationsURL.appendingPathComponent(fileURL.lastPathComponent)
+            default:
+                print("102")
+            }
+            
             // write temporary file to disk/icloud folder
             do {
                 try data.write(to: newFileURL)
-                print("success")
+                print("Successfully saved file to iCloud Drive")
             } catch {
                 print(error)
             }
@@ -436,12 +541,71 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             destination.preferredContentSize = sortCollectionViewBox
             destination.popoverPresentationController?.sourceRect = sortSTButton.bounds
         }
+        if (segue.identifier == "seguePDFViewController") {
+            let destination = segue.destination as! PDFViewController
+            destination.document = PDFdocument
+            destination.PDFfilename = PDFfilename
+        }
     }
     
     public func documentMenu(_ documentMenu: UIDocumentMenuViewController, didPickDocumentPicker documentPicker: UIDocumentPickerViewController) {
         
     }
     
+    func saveToCoreData() {
+//        let newArticle = Articles(context: context)
+//
+//        let unfiledGroup = articleGroups.first(where: {$0.tag == "Unfiled"})
+//        let allArticles = articleGroups.first(where: {$0.tag == "All articles"})
+    }
+    
+    
+    func saveToIcloud(url: URL) {
+        if let zoneID = recordZone?.zoneID {
+            let myRecord = CKRecord(recordType: categories[selectedCategoryNumber], zoneID: zoneID)
+            switch categories[selectedCategoryNumber] {
+            case "Publications":
+                // Saving default values
+                let thumbnail = CKAsset(fileURL: url)
+                let tag = ["All papers", "Unfiled"]
+                myRecord.setObject(url.lastPathComponent as CKRecordValue?, forKey: "Filename")
+                myRecord.setObject("No author" as CKRecordValue?, forKey: "Author")
+                myRecord.setObject(thumbnail as CKRecordValue?, forKey: "Thumbnail")
+                myRecord.setObject(tag as CKRecordValue?, forKey: "Group")
+                myRecord.setObject(50 as CKRecordValue?, forKey: "Rank")
+                myRecord.setObject("No notes" as CKRecordValue?, forKey: "Note")
+                
+                let modifyRecordsOperation = CKModifyRecordsOperation(recordsToSave: [myRecord], recordIDsToDelete: nil)
+                let configuration = CKOperationConfiguration()
+                configuration.timeoutIntervalForRequest = 10
+                configuration.timeoutIntervalForResource = 10
+                
+                modifyRecordsOperation.configuration = configuration
+                modifyRecordsOperation.modifyRecordsCompletionBlock =
+                    { records, recordIDs, error in
+                        if let err = error {
+                            print(err)
+                        } else {
+                            DispatchQueue.main.async {
+                                print("Record saved successfully to icloud database")
+                            }
+                            self.currentRecord = myRecord
+                        }
+                }
+                privateDatabase?.add(modifyRecordsOperation)
+            default:
+                print("101")
+            }
+        }
+    }
+    
+    func getThumbnail(url: URL) -> UIImage {
+        let document = PDFDocument(url: url)
+        let page: PDFPage!
+        page = document?.page(at: 0)!
+        let pageThumbnail = page.thumbnail(of: CGSize(width: 210, height: 297), for: .artBox)
+        return pageThumbnail
+    }
     
     // MARK: - Collection View
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
@@ -505,7 +669,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     }
     
     
-
+    override func viewWillAppear(_ animated: Bool) {
+        self.navigationController?.isNavigationBarHidden = true
+    }
     
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
