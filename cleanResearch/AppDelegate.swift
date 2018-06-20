@@ -19,7 +19,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var iCloudURL: URL?
     var docURL: URL?
     var localURL: URL?
-    var pubURL: URL?
+    var publicationURL: URL?
     var manuscriptURL: URL?
     var presentationURL: URL?
     var proposalsURL: URL?
@@ -34,7 +34,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         iCloudURL = FileManager.default.url(forUbiquityContainerIdentifier: nil)
         docURL = iCloudURL?.appendingPathComponent("Documents", isDirectory: true)
         
-        pubURL = docURL?.appendingPathComponent("Publications", isDirectory: true)
+        publicationURL = docURL?.appendingPathComponent("Publications", isDirectory: true)
         manuscriptURL = docURL?.appendingPathComponent("Manuscript", isDirectory: true)
         presentationURL = docURL?.appendingPathComponent("Presentations", isDirectory: true)
         proposalsURL = docURL?.appendingPathComponent("Proposals", isDirectory: true)
@@ -42,8 +42,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         teachingURL = docURL?.appendingPathComponent("Teaching", isDirectory: true)
         patentsURL = docURL?.appendingPathComponent("Patents", isDirectory: true)
         
+        // Create folders under iCloud Drive/cleanResearch/...
         do {
-            try FileManager.default.createDirectory(at: pubURL!, withIntermediateDirectories: false, attributes: nil)
+            try FileManager.default.createDirectory(at: publicationURL!, withIntermediateDirectories: false, attributes: nil)
         } catch let error as NSError {
             print(error.localizedDescription);
         }
@@ -77,6 +78,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         } catch let error as NSError {
             print(error.localizedDescription);
         }
+        
+        // Core data
+        container = NSPersistentContainer(name: "cleanResearch")
+        container.loadPersistentStores(completionHandler: { (storeDescription, error) in
+            if error == nil {
+                self.context = self.container.viewContext
+            } else {
+                print("Error 101")
+            }
+        })
+        
         return true
     }
 
