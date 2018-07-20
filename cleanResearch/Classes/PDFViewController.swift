@@ -80,6 +80,7 @@ class PDFViewController: UIViewController {
         toggleThumbnailButton.image = toggleThumbnailImage
 //
         self.navigationItem.rightBarButtonItem = toggleThumbnailButton
+        self.navigationItem.title = PDFfilename
 //        s = [optionsButton, toggleThumbnailButton]
 //
 //        //        let toggleThumbnailViews = UIBarButtonItem(image: #imageLiteral(resourceName: "ToggleThumbnail"), style: .plain, target: self, action: #selector(toggleSidebar))

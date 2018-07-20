@@ -8,9 +8,11 @@
     <entity name="Publication" representedClassName="Publication" syncable="YES" codeGenerationType="class">
         <attribute name="dateCreated" optional="YES" attributeType="Date" usesScalarValueType="NO" syncable="YES"/>
         <attribute name="dateModified" optional="YES" attributeType="Date" usesScalarValueType="NO" syncable="YES"/>
+        <attribute name="favorite" optional="YES" attributeType="String" syncable="YES"/>
         <attribute name="filename" optional="YES" attributeType="String" syncable="YES"/>
         <attribute name="note" optional="YES" attributeType="String" syncable="YES"/>
         <attribute name="rank" optional="YES" attributeType="Float" defaultValueString="0" usesScalarValueType="YES" syncable="YES"/>
+        <attribute name="recordName" optional="YES" attributeType="String" syncable="YES"/>
         <attribute name="thumbnail" optional="YES" attributeType="Transformable" syncable="YES"/>
         <attribute name="title" optional="YES" attributeType="String" syncable="YES"/>
         <attribute name="url" optional="YES" attributeType="URI" syncable="YES"/>
@@ -26,7 +28,7 @@
     </entity>
     <elements>
         <element name="Author" positionX="-279" positionY="-36" width="128" height="90"/>
-        <element name="Publication" positionX="-63" positionY="-18" width="128" height="210"/>
+        <element name="Publication" positionX="-63" positionY="-18" width="128" height="240"/>
         <element name="PublicationGroup" positionX="-326" positionY="162" width="128" height="103"/>
     </elements>
 </model>

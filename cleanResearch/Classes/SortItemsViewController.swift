@@ -10,8 +10,8 @@ import UIKit
 
 class SortItemsViewController: UIViewController {
 
-    var sortCollectionViewValue = 0
-    var sortCollectionViewStrings: [String] = [""]
+    var sortValue = 0
+    var sortStrings: [String] = [""]
 
     @IBOutlet weak var sortOptions: UISegmentedControl!
     
@@ -23,8 +23,8 @@ class SortItemsViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        sortOptions.replaceSegments(segments: sortCollectionViewStrings)
-        sortOptions.selectedSegmentIndex = sortCollectionViewValue
+        sortOptions.replaceSegments(segments: sortStrings)
+        sortOptions.selectedSegmentIndex = sortValue
 
     }
 

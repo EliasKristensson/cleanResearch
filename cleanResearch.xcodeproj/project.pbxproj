@@ -27,6 +27,9 @@
 		64798D33207638D500E378B2 /* PresentationsIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = 64798D31207638D400E378B2 /* PresentationsIcon.png */; };
 		64798D34207638D500E378B2 /* PublicationsIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = 64798D32207638D500E378B2 /* PublicationsIcon.png */; };
 		64798D362078154300E378B2 /* CoreDataHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64798D352078154300E378B2 /* CoreDataHelper.swift */; };
+		6494817120EB656400768440 /* SettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6494817020EB656400768440 /* SettingsViewController.swift */; };
+		6494817320ED6A0600768440 /* FrontPictureLSHR.png in Resources */ = {isa = PBXBuildFile; fileRef = 6494817220ED6A0600768440 /* FrontPictureLSHR.png */; };
+		649B169920F2203700383300 /* fileIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = 649B169820F2203700383300 /* fileIcon.png */; };
 		64CD3E09207B3BEB00FF3073 /* SortItemsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64CD3E08207B3BEB00FF3073 /* SortItemsViewController.swift */; };
 		64F02B42207B3EDB00CEB186 /* NotificationNameExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64F02B41207B3EDB00CEB186 /* NotificationNameExtension.swift */; };
 		64F02B44207BB7EC00CEB186 /* SortSubtableViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64F02B43207BB7EC00CEB186 /* SortSubtableViewController.swift */; };
@@ -79,8 +82,13 @@
 		64798D31207638D400E378B2 /* PresentationsIcon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = PresentationsIcon.png; sourceTree = "<group>"; };
 		64798D32207638D500E378B2 /* PublicationsIcon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = PublicationsIcon.png; sourceTree = "<group>"; };
 		64798D352078154300E378B2 /* CoreDataHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreDataHelper.swift; sourceTree = "<group>"; };
+		6483F27520DAD0D9005E3D08 /* cleanResearch 4.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "cleanResearch 4.xcdatamodel"; sourceTree = "<group>"; };
+		6494817020EB656400768440 /* SettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewController.swift; sourceTree = "<group>"; };
+		6494817220ED6A0600768440 /* FrontPictureLSHR.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = FrontPictureLSHR.png; sourceTree = "<group>"; };
+		649B169820F2203700383300 /* fileIcon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = fileIcon.png; sourceTree = "<group>"; };
 		64CC7FF020D4029C00C15863 /* cleanResearch 3.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "cleanResearch 3.xcdatamodel"; sourceTree = "<group>"; };
 		64CD3E08207B3BEB00FF3073 /* SortItemsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortItemsViewController.swift; sourceTree = "<group>"; };
+		64DB016E20E6DC310064A2D1 /* cleanResearch 5.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "cleanResearch 5.xcdatamodel"; sourceTree = "<group>"; };
 		64F02B41207B3EDB00CEB186 /* NotificationNameExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationNameExtension.swift; sourceTree = "<group>"; };
 		64F02B43207BB7EC00CEB186 /* SortSubtableViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortSubtableViewController.swift; sourceTree = "<group>"; };
 		64FE322A20C853E50005E9DC /* PDFViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFViewController.swift; sourceTree = "<group>"; };
@@ -171,6 +179,8 @@
 		64798CDE207556CA00E378B2 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				649B169820F2203700383300 /* fileIcon.png */,
+				6494817220ED6A0600768440 /* FrontPictureLSHR.png */,
 				64798D31207638D400E378B2 /* PresentationsIcon.png */,
 				64798D32207638D500E378B2 /* PublicationsIcon.png */,
 				64798CE12075575600E378B2 /* Articles.png */,
@@ -195,6 +205,7 @@
 		64798D372078154900E378B2 /* Classes */ = {
 			isa = PBXGroup;
 			children = (
+				6494817020EB656400768440 /* SettingsViewController.swift */,
 				64F02B41207B3EDB00CEB186 /* NotificationNameExtension.swift */,
 				64CD3E08207B3BEB00FF3073 /* SortItemsViewController.swift */,
 				64F02B43207BB7EC00CEB186 /* SortSubtableViewController.swift */,
@@ -321,8 +332,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				64798CBB2075554900E378B2 /* LaunchScreen.storyboard in Resources */,
+				6494817320ED6A0600768440 /* FrontPictureLSHR.png in Resources */,
 				64798D34207638D500E378B2 /* PublicationsIcon.png in Resources */,
 				64798CB82075554900E378B2 /* Assets.xcassets in Resources */,
+				649B169920F2203700383300 /* fileIcon.png in Resources */,
 				64798CE92075575600E378B2 /* Presentations.png in Resources */,
 				64798CEA2075575600E378B2 /* Proposals.png in Resources */,
 				64798CE82075575600E378B2 /* Articles.png in Resources */,
@@ -361,6 +374,7 @@
 				64F02B42207B3EDB00CEB186 /* NotificationNameExtension.swift in Sources */,
 				64798D362078154300E378B2 /* CoreDataHelper.swift in Sources */,
 				64CD3E09207B3BEB00FF3073 /* SortItemsViewController.swift in Sources */,
+				6494817120EB656400768440 /* SettingsViewController.swift in Sources */,
 				64798CF22075622900E378B2 /* MyDocument.swift in Sources */,
 				64798CB02075554600E378B2 /* ViewController.swift in Sources */,
 				64798CAE2075554600E378B2 /* AppDelegate.swift in Sources */,
@@ -698,11 +712,13 @@
 		64798CB42075554600E378B2 /* cleanResearch.xcdatamodeld */ = {
 			isa = XCVersionGroup;
 			children = (
+				64DB016E20E6DC310064A2D1 /* cleanResearch 5.xcdatamodel */,
+				6483F27520DAD0D9005E3D08 /* cleanResearch 4.xcdatamodel */,
 				64CC7FF020D4029C00C15863 /* cleanResearch 3.xcdatamodel */,
 				6435F0CF20D29B2000141E9A /* cleanResearch 2.xcdatamodel */,
 				64798CB52075554600E378B2 /* cleanResearch.xcdatamodel */,
 			);
-			currentVersion = 64CC7FF020D4029C00C15863 /* cleanResearch 3.xcdatamodel */;
+			currentVersion = 64DB016E20E6DC310064A2D1 /* cleanResearch 5.xcdatamodel */;
 			path = cleanResearch.xcdatamodeld;
 			sourceTree = "<group>";
 			versionGroupType = wrapper.xcdatamodel;

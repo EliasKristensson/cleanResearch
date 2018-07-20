@@ -26,6 +26,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var supervisionURL: URL?
     var teachingURL: URL?
     var patentsURL: URL?
+    var miscellaneousURL: URL?
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplicationLaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
@@ -35,12 +36,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         docURL = iCloudURL?.appendingPathComponent("Documents", isDirectory: true)
         
         publicationURL = docURL?.appendingPathComponent("Publications", isDirectory: true)
-        manuscriptURL = docURL?.appendingPathComponent("Manuscript", isDirectory: true)
+        manuscriptURL = docURL?.appendingPathComponent("Manuscripts", isDirectory: true)
         presentationURL = docURL?.appendingPathComponent("Presentations", isDirectory: true)
         proposalsURL = docURL?.appendingPathComponent("Proposals", isDirectory: true)
         supervisionURL = docURL?.appendingPathComponent("Supervision", isDirectory: true)
         teachingURL = docURL?.appendingPathComponent("Teaching", isDirectory: true)
         patentsURL = docURL?.appendingPathComponent("Patents", isDirectory: true)
+        miscellaneousURL = docURL?.appendingPathComponent("Miscellaneous", isDirectory: true)
         
         // Create folders under iCloud Drive/cleanResearch/...
         do {
@@ -78,6 +80,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         } catch let error as NSError {
             print(error.localizedDescription);
         }
+        do {
+            try FileManager.default.createDirectory(at: miscellaneousURL!, withIntermediateDirectories: false, attributes: nil)
+        } catch let error as NSError {
+            print(error.localizedDescription);
+        }
         
         // Core data
         container = NSPersistentContainer(name: "cleanResearch")
@@ -85,7 +92,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             if error == nil {
                 self.context = self.container.viewContext
             } else {
-                print("Error 101")
+                print("Error loading persistent store")
             }
         })
         
