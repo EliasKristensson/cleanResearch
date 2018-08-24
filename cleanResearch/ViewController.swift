@@ -6,6 +6,8 @@
 //  Copyright © 2018 Elias Kristensson. All rights reserved.
 //
 
+//FIX: TOGGLING FAVORITES DOES NOT WORK
+
 import UIKit
 import CloudKit
 import PDFKit
@@ -27,6 +29,7 @@ struct PublicationFile {
     var dateModified: Date?
     var favorite: String?
     var author: String?
+    var journal: String?
     var groups: [String?]
 //    var currentItems: [Any]
 //    var currentItem: Int
@@ -56,6 +59,7 @@ struct LocalFile {
     var filename: String
     var url: URL
     var title: String?
+    var journal: String?
     var year: Int16?
     var category: String
     var rank: Float?
@@ -66,6 +70,7 @@ struct LocalFile {
     var groups: [String?]
     var parentFolder: String?
     var available: Bool
+    var filetype: String?
 }
 
 struct File {
@@ -98,7 +103,9 @@ class FilesCell: UICollectionViewCell {
     @IBOutlet weak var label: UILabel!
     @IBOutlet weak var favoriteIcon: UIButton!
     @IBOutlet weak var hiddenFilename: UILabel!
-    @IBOutlet weak var icloudSync: UIButton!
+    @IBOutlet weak var deleteIcon: UIImageView!
+    @IBOutlet weak var selectedFileFrame: UIImageView!
+    @IBOutlet weak var fileOffline: UIImageView!
     
 }
 
@@ -120,11 +127,13 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     var context: NSManagedObjectContext!
     var publicationsCD: [Publication] = []
     var authorsCD: [Author] = []
+    var journalsCD: [Journal] = []
     var publicationGroupsCD: [PublicationGroup] = []
+    var manuscriptsCD: [Manuscript] = []
     
     var currentPublication: Publication!
-    var currentAuthor: Author!
-    var currentGroup: PublicationGroup!
+//    var currentAuthor: Author!
+//    var currentGroup: PublicationGroup!
     var currentIndexPath: IndexPath!
 
     
@@ -138,6 +147,11 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     var kvStorage: NSUbiquitousKeyValueStore!
     var publicationsURL: URL!
     var manuscriptsURL: URL!
+    var proposalsURL: URL!
+    var presentationsURL: URL!
+    var supervisionsURL: URL!
+    var miscellaneousURL: URL!
+    var patentsURL: URL!
     var metaDataQuery: NSMetadataQuery?
     var metaData: NSMetadataQuery!
     var publicationsIC: [PublicationFile] = []
@@ -145,18 +159,20 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     
     // MARK: - UI variables
     let documentInteractionController = UIDocumentInteractionController()
-    let categories: [String] = ["Publications", "Manuscripts", "Presentations", "Proposals", "Supervision", "Teaching", "Patents"]
+    let categories: [String] = ["Publications", "Manuscripts", "Presentations", "Proposals", "Supervision", "Teaching", "Patents", "Miscellaneous"]
     var settingsCollectionViewBox = CGSize(width: 250, height: 300)
     var currentTheme: Int = 0
+    var editingFilesCV = false
+    var currentSelectedFilename: String? = nil
     
     var sortCollectionViewBox = CGSize(width: 348, height: 28)
     var sortCollectionViewNumbers: [Int] = [0, 0, 0, 0, 0, 0, 0]
-    var sortCollectionViewStrings: [String] = ["Filename", "Title", "Year", "Author", "Rank"]
+    var sortCollectionViewStrings: [String] = [""]
     var selectedCategoryNumber = 0
 
     var localFiles: [[LocalFile]] = [[]]
     var filesCV: [[LocalFile]] = [[],[],[],[],[],[],[],[]] //Place files to be displayed in collection view here
-    var sortSubtableStrings: [String] = ["Tag", "Author", "Year", "Rank"]
+    var sortSubtableStrings: [String] = [""]
     var sortSubtableNumbers: [Int] = [0, 0, 0, 0, 0, 0, 0]
     var selectedSubtableNumber = 0
     var sortTableTitles: [String] = [""]
@@ -169,8 +185,10 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     
     var PDFdocument: PDFDocument!
     var PDFfilename: String!
+    var annotationSettings: [Int] = [0, 0, 0, 0]
     
-    var manuscriptSections = ["Manuscript files", "Figures", "Matlab files", "Miscellaneous"]
+    var manuscriptSections = [""]
+    var proposalsSections = [""]
     
     // MARK: - Outlets
     @IBOutlet var mainView: UIView!
@@ -186,14 +204,15 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     @IBOutlet weak var segmentedControllTablesOrNotes: UISegmentedControl!
     @IBOutlet weak var sortCVButton: UIButton!
     @IBOutlet weak var sortSTButton: UIButton!
-    @IBOutlet weak var focusedViewButton: UISwitch!
-    @IBOutlet weak var focusedViewText: UILabel!
+    
     
     @IBOutlet weak var largeThumbnail: UIImageView!
     @IBOutlet weak var favoriteButton: UIButton!
     @IBOutlet weak var filenameString: UITextField!
-    @IBOutlet weak var titleString: UITextField!
-    @IBOutlet weak var notesTextView: UITextView!
+    @IBOutlet weak var journalString: UITextField!
+    @IBOutlet weak var notesString: UITextField!
+    
+//    @IBOutlet weak var notesTextView: UITextView!
     @IBOutlet weak var authorString: UITextField!
     @IBOutlet weak var yearString: UITextField!
     @IBOutlet weak var rankValue: UILabel!
@@ -335,56 +354,69 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     
     //FIX: FAVORITES DOES NOT UPLOAD TO ICLOUD
     @IBAction func favoriteTapped(_ sender: Any) {
-        let cell = self.filesCollectionView.cellForItem(at: currentIndexPath!) as? FilesCell
+        let filename = filenameString.text
         var localFileIndex = Int()
 
         switch categories[selectedCategoryNumber] {
         case "Publications":
-            
-            if (cell?.favoriteIcon.isHidden)! {
-                cell?.favoriteIcon.isHidden = false
-                cell?.favoriteIcon.setImage(#imageLiteral(resourceName: "FavoriteOn"), for: .normal)
-                favoriteButton.setImage(#imageLiteral(resourceName: "FavoriteOn"), for: .normal)
-                for i in 0..<localFiles[0].count {
-                    if localFiles[0][i].filename == cell?.hiddenFilename.text {
-                        localFileIndex = i
-                        localFiles[0][i].favorite = "Yes"
-                    }
+
+            let favoritesGroup = publicationGroupsCD.first(where: {$0.tag == "Favorites"})
+            var localFileIndex = Int()
+
+            for i in 0..<localFiles[0].count {
+                if localFiles[0][i].filename == filename {
+                    localFileIndex = i
                 }
-                //FIX: Localfiles have entries that are not in Core data.
-                if let favoritesGroup = publicationGroupsCD.first(where: {$0.tag == "Favorites"}) {
-                    if let currentPublication = publicationsCD.first(where: {$0.filename == cell?.hiddenFilename.text}) {
-                        currentPublication.addToPublicationGroup(favoritesGroup) // currentPublication exists
-                        currentPublication.favorite = "Yes"
-                    } else {
-                        addFileToCoreData(file: localFiles[0][localFileIndex])
-                    }
+            }
+            
+            if localFiles[0][localFileIndex].favorite == "No" {
+                favoriteButton.setImage(#imageLiteral(resourceName: "FavoriteOn"), for: .normal)
+                localFiles[0][localFileIndex].favorite = "Yes"
+                localFiles[0][localFileIndex].groups.append("Favorites")
+                
+                print(localFiles[0][localFileIndex].filename + " now favorite")
+                
+                if let currentPublication = publicationsCD.first(where: {$0.filename == filename}) {
+                    currentPublication.addToPublicationGroup(favoritesGroup!) // currentPublication exists
+                    currentPublication.favorite = "Yes"
+                    saveCoreData()
+                    loadCoreData()
+
+                } else {
+                    addFileToCoreData(file: localFiles[0][localFileIndex])
                 }
                 
             } else {
-                cell?.favoriteIcon.isHidden = true
                 favoriteButton.setImage(#imageLiteral(resourceName: "FavoriteOff"), for: .normal)
-                if let currentPublication = publicationsCD.first(where: {$0.filename == cell?.hiddenFilename.text}) {
+                localFiles[0][localFileIndex].favorite = "No"
+                let groups = localFiles[0][localFileIndex].groups
+                let newGroups = groups.filter { $0 != "Favorites" }
+                localFiles[0][localFileIndex].groups = newGroups //"FAVORITES" REMOVED
+
+                if let currentPublication = publicationsCD.first(where: {$0.filename == filename}) {
+                    currentPublication.removeFromPublicationGroup(favoritesGroup!)
                     currentPublication.favorite = "No"
-                }
-                if let favoritesGroup = publicationGroupsCD.first(where: {$0.tag == "Favorites"}) {
-                    currentPublication.removeFromPublicationGroup(favoritesGroup)
+                    saveCoreData()
+                    loadCoreData()
+
+                } else {
+                    addFileToCoreData(file: localFiles[0][localFileIndex])
                 }
             }
+            
+            updateIcloud(file: localFiles[0][localFileIndex])
             saveCoreData()
             loadCoreData()
             
             populateFilesCV()
+            sortItems()
+            listTableView.reloadData()
             filesCollectionView.reloadData()
             
         default:
             print("Default 134")
         }
     }
-    
-    @IBAction func toggleFocusedView(_ sender: Any) {
-    }
-    
     
     @IBAction func toggleTableNotes(_ sender: Any) {
         let selectedOption = segmentedControllTablesOrNotes.titleForSegment(at: segmentedControllTablesOrNotes.selectedSegmentIndex)
@@ -407,96 +439,12 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             }
             
         default:
-            print("")
+            print("Default 140")
         }
     }
     
     @IBAction func rankSlider(_ sender: Any) {
         rankValue.text = "\(Int(rankOutlet.value))"
-    }
-    
-    @IBAction func updateFile(_ sender: Any) {
-        activityIndicator.startAnimating()
-        switch categories[selectedCategoryNumber] {
-        case "Publications":
-            
-            // UPDATING LOCALFILES
-            let currentFile = updateLocalFiles()
-            
-            // UPDATING CORE DATA
-            updateCoreData(file: currentFile!)
-
-            // UPDATING ICLOUD. CORE DATA SHOULD BE UPDATED WITH LATEST CHANGES, USE THIS TO UPDATE ICLOUD
-            if let currentPublication = publicationsCD.first(where: {$0.filename == filenameString.text}) {
-                updateIcloud(file: currentPublication)
-            }
-            
-            populateListTable()
-            populateFilesCV()
-            listTableView.reloadData()
-            filesCollectionView.reloadData()
-
-//            // UPDATING PUBLICATIONSIC
-//            if let index = publicationsIC.index(where: {$0.filename == currentPublication.filename}) {
-//
-//                publicationsIC[index].dateModified = Date()
-//                publicationsIC[index].rank = rankOutlet.value
-//
-//                if (titleString.text?.isEmpty)! {
-//                    publicationsIC[index].title = "No title"
-//                } else {
-//                    publicationsIC[index].title = titleString.text
-//                }
-//                if (yearString.text?.isEmpty)! {
-//                    publicationsIC[index].year = -2000
-//                } else {
-//                    publicationsIC[index].year = isStringAnInt(stringNumber: yearString.text!)
-//                }
-//
-//                if (notesTextView.text?.isEmpty)! {
-//                    publicationsIC[index].note = "No note"
-//                } else {
-//                    publicationsIC[index].note = notesTextView.text
-//                }
-//
-//                if (authorString.text?.isEmpty)! {
-//                    publicationsIC[index].author = "No author"
-//                } else {
-//                    publicationsIC[index].author = authorString.text
-//                }
-//
-//                var groups = [String]()
-//                for group in currentPublication.publicationGroup?.allObjects as! [PublicationGroup] {
-//                    groups.append(group.tag!)
-//                }
-//                publicationsIC[index].groups = groups
-//
-//            } else {
-//                // ADD NEW ITEM TO PUBLICATIONSIC
-//                var groups = [String]()
-//                for group in currentPublication.publicationGroup?.allObjects as! [PublicationGroup] {
-//                    groups.append(group.tag!)
-//                }
-//                let thumbnail = self.getThumbnail(url: self.publicationsURL.appendingPathComponent(currentPublication.filename!), pageNumber: 0)
-//
-//                let newPublication = PublicationFile(filename: currentPublication.filename!, title: currentPublication.title, year: currentPublication.year, thumbnails: [thumbnail], category: "Publications", rank: currentPublication.rank, note: currentPublication.note, dateCreated: currentPublication.dateCreated, dateModified: currentPublication.dateModified, favorite: currentPublication.favorite, author: currentPublication.author?.name, groups: groups)
-//
-//                publicationsIC.append(newPublication)
-//            }
-            
-            
-            
-        default:
-            print("105")
-        }
-        
-        listTableView.reloadData()
-        
-        activityIndicator.stopAnimating()
-    }
-    
-    @IBAction func deleteFile(_ sender: Any) {
-        
     }
     
     @IBAction func nextPDFPage(_ sender: Any) {
@@ -529,19 +477,43 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     }
     
     @IBAction func tappedLoad(_ sender: Any) {
-//        for item in publicationsCD {
-//            print(item.filename)
-//        }
-        
-        for items in filesCV {
-            for item in items {
-                print(item.filename)
-            }
+
+//        print(filenameString.text)
+        let fileManager = FileManager.default
+        let fileURL = publicationsURL.appendingPathComponent("." + filenameString.text! + ".icloud")
+        do {
+            try fileManager.startDownloadingUbiquitousItem(at: fileURL)
+        } catch let error {
+            print(error)
         }
-//        for item in localFiles[0] {
-//            print(item.filename)
-//            print(item.groups)
+//        :startDownloadingUbiquitousItemAtURL:error
+//
+//
+////        iCloudURL = fileManager.url(forUbiquityContainerIdentifier: nil)
+////        guard iCloudURL != nil else {
+////            print("Unable to access iCloud account")
+////            return
+////        }
+////        iCloudURL = iCloudURL?.appendingPathComponent("Documents/savefile.txt")
+//        guard filenameString.text != nil else {
+//            print("No file selected")
+//            return
 //        }
+//        let fileURL = publicationsURL.appendingPathComponent(filenameString.text! + ".icloud")
+//        print(fileURL)
+//        metaDataQuery = NSMetadataQuery()
+////        metaDataQuery?.predicate = NSPredicate(format: "name = %@", filenameString.text!)
+//        metaDataQuery?.predicate = NSPredicate(format: "%K like '.Sedarsky2013.pdf.icloud'", NSMetadataItemFSNameKey)
+////        metaDataQuery?.predicate = NSPredicate(format: "%K ENDSWITH '.pdf'", NSMetadataItemFSNameKey)
+////        //        metaDataQuery?.predicate = NSPredicate(format: "%K.pathExtension = '.'", NSMetadataItemFSNameKey)
+////
+//        metaDataQuery?.searchScopes = [NSMetadataQueryUbiquitousDocumentsScope]
+////
+//        NotificationCenter.default.addObserver(self, selector: #selector(ViewController.metadataQueryDidFinishGathering), name: NSNotification.Name.NSMetadataQueryDidFinishGathering, object: metaDataQuery!)
+//        metaDataQuery?.start()
+        
+        
+        
 //        let request: NSFetchRequest<Publication> = Publication.fetchRequest()
 //        do {
 //            let items = try context.fetch(request)
@@ -552,9 +524,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
 //            print("Error deleting 1")
 //        }
 //
-//        let requestAuthors: NSFetchRequest<Author> = Author.fetchRequest()
+//        let request: NSFetchRequest<Journal> = Journal.fetchRequest()
 //        do {
-//            let items = try context.fetch(requestAuthors)
+//            let items = try context.fetch(request)
 //            for item in items {
 //                context.delete(item)
 //            }
@@ -578,7 +550,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     }
     
     @IBAction func Refresh(_ sender: Any) {
+        readIcloudDriveFolders()
         compareLocalFilesWithDatabase()
+        populateFilesCV()
         populateListTable()
         sortItems()
         listTableView.reloadData()
@@ -647,6 +621,37 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         }
     }
     
+    @IBAction func journalStringEditingEnded(_ sender: Any) {
+        updateDatabasesWithNewFileInformation()
+    }
+    
+    @IBAction func authorStringEditingEnded(_ sender: Any) {
+        updateDatabasesWithNewFileInformation()
+    }
+    
+    @IBAction func yearStringEditingEnded(_ sender: Any) {
+        updateDatabasesWithNewFileInformation()
+    }
+    
+    @IBAction func rankSliderEditingEnded(_ sender: Any) {
+        updateDatabasesWithNewFileInformation()
+    }
+    
+    @IBAction func rankSliderEditingEndedOutside(_ sender: Any) {
+        updateDatabasesWithNewFileInformation()
+    }
+    
+    @IBAction func notesStringEditingEnded(_ sender: Any) {
+        updateDatabasesWithNewFileInformation()
+    }
+    
+    @IBAction func editIconTapped(_ sender: Any) {
+        editingFilesCV = !editingFilesCV
+        filesCollectionView.reloadData()
+    }
+    
+    
+    
     
     
     
@@ -654,14 +659,23 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     override func viewDidLoad() {
         super.viewDidLoad()
         
+        activityIndicator.startAnimating()
+        
         isIcloudAvailble()
         
         //MARK: - AppDelegate
         let app = UIApplication.shared
         appDelegate = app.delegate as! AppDelegate
         context = appDelegate.context
+        
         publicationsURL = appDelegate.publicationURL
         manuscriptsURL = appDelegate.manuscriptURL
+        proposalsURL = appDelegate.publicationURL
+        patentsURL = appDelegate.patentsURL
+        supervisionsURL = appDelegate.supervisionURL
+        presentationsURL = appDelegate.presentationURL
+        miscellaneousURL = appDelegate.miscellaneousURL
+        
         iCloudURL = appDelegate.iCloudURL
         
         mainVC = self
@@ -687,16 +701,21 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         listTableView.delegate = self
         listTableView.dataSource = self
         listTableView.dropDelegate = self
-
+        
         NotificationCenter.default.addObserver(self, selector: #selector(handleSorttablePopupClosing), name: Notification.Name.sortSubtable, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleSortFilesPopupClosing), name: Notification.Name.sortCollectionView, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleSettingsPopupClosing), name: Notification.Name.settingsCollectionView, object: nil)
-        
+        NotificationCenter.default.addObserver(self, selector: #selector(handlePDFClosing), name: Notification.Name.closingPDF, object: nil)
+
         // Touch gestures
         let doubleTap = UITapGestureRecognizer(target: self, action: #selector(doubleTapped))
         doubleTap.numberOfTapsRequired = 2
         self.filesCollectionView.addGestureRecognizer(doubleTap)
 
+        for journal in journalsCD {
+            print(journal.name)
+            print(journal.publication)
+        }
         
 //        getRecordNames()
 
@@ -715,8 +734,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         print("metadataQueryDidFinishGathering")
         if query.resultCount > 0 {
             for res in query.results as! [NSMetadataItem] {
-                let name = res.value(forAttribute: NSMetadataItemFSNameKey) as! String
-                print(name)
+                print(res)
+//                let name = res.value(forAttribute: NSMetadataItemFSNameKey) as! String
+//                print(name)
             }
         }
 //        if query.resultCount == 1 {
@@ -753,6 +773,8 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         kvStorage.set(currentTheme, forKey: "currentTheme")
         kvStorage.synchronize()
 
+        self.categoriesCV.reloadData()
+        
     }
     
     @objc func handleSorttablePopupClosing(notification: Notification) {
@@ -791,12 +813,21 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         //        subTableView.selectRow(at: indexPath, animated: true, scrollPosition: .top)
     }
     
+    @objc func handlePDFClosing(notification: Notification) {
+        let vc = notification.object as! PDFViewController
+        annotationSettings = vc.annotationSettings!
+
+        kvStorage.set(annotationSettings, forKey: "annotationSettings")
+        kvStorage.synchronize()
+    }
+    
     @objc func doubleTapped(gesture: UITapGestureRecognizer) {
+        //FIX: WRONG FILE OPENS
         switch categories[selectedCategoryNumber] {
         case "Publications":
             let pointInCollectionView = gesture.location(in: self.filesCollectionView)
             if let indexPath = self.filesCollectionView.indexPathForItem(at: pointInCollectionView) {
-                let selectedCell = filesCV[selectedSubtableNumber][indexPath.row]
+                let selectedCell = filesCV[indexPath.section][indexPath.row]
                 let url = publicationsURL.appendingPathComponent((selectedCell.filename))
                 PDFdocument = PDFDocument(url: url)
                 PDFfilename = selectedCell.filename
@@ -809,6 +840,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             print("Default 110")
         }
     }
+    
     
     
     
@@ -858,155 +890,106 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         activityIndicator.stopAnimating()
     }
     
-    func updateIcloud(file: Any) {
+    func updateIcloud(file: LocalFile) {
         activityIndicator.startAnimating()
-        let currentPublication = file as! Publication
         
-        if let recName = currentPublication.filename {
-            let predicate = NSPredicate(format: "Filename = %@", recName)
-            let query = CKQuery(recordType: "Publications", predicate: predicate)
-
-            privateDatabase?.perform(query, inZoneWith: recordZone?.zoneID) { (records, error) in
-                guard let records = records else {return}
-                DispatchQueue.main.async {
-                    // FOUND AT LEAST ONE RECORD
-                    if records.count > 0 {
-                        for record in records {
-                            if record.object(forKey: "Filename") as! String == recName {
-                                print(record.object(forKey: "Filename") as! String)
-                                
-                                var groups = [String]()
-                                for group in currentPublication.publicationGroup?.allObjects as! [PublicationGroup] {
-                                    groups.append(group.tag!)
-                                }
-                                
-                                record.setObject(currentPublication.year as CKRecordValue?, forKey: "Year")
-                                record.setObject(currentPublication.title as CKRecordValue?, forKey: "Title")
-                                record.setObject(currentPublication.favorite as CKRecordValue?, forKey: "Favorite")
-                                record.setObject(currentPublication.note! as CKRecordValue?, forKey: "Note")
-                                record.setObject(Int(currentPublication.rank) as CKRecordValue?, forKey: "Rank")
-                                record.setObject(currentPublication.author?.name as CKRecordValue?, forKey: "Author")
-                                record.setObject(groups as CKRecordValue?, forKey: "Group")
-                                
-                                self.privateDatabase?.save(record, completionHandler:( { savedRecord, error in
-                                    DispatchQueue.main.async {
-                                        if let error = error {
-                                            print("accountStatus error: \(error)")
-                                        } else {
-                                            print("1. Updated record: " + recName)
-                                        }
+        let predicate = NSPredicate(format: "Filename = %@", file.filename)
+        let query = CKQuery(recordType: "Publications", predicate: predicate)
+        
+        privateDatabase?.perform(query, inZoneWith: recordZone?.zoneID) { (records, error) in
+            guard let records = records else {return}
+            DispatchQueue.main.async {
+                // FOUND AT LEAST ONE RECORD
+                if records.count > 0 {
+                    for record in records {
+                        if record.object(forKey: "Filename") as! String == file.filename {
+                            
+//                            var groups = [String]()
+//                            for group in currentPublication.publicationGroup?.allObjects as! [PublicationGroup] {
+//                                groups.append(group.tag!)
+//                            }
+                            
+                            record.setObject(file.year as CKRecordValue?, forKey: "Year")
+                            record.setObject(file.favorite as CKRecordValue?, forKey: "Favorite")
+                            record.setObject(file.note as CKRecordValue?, forKey: "Note")
+                            record.setObject(Int(file.rank!) as CKRecordValue?, forKey: "Rank")
+                            record.setObject(file.author as CKRecordValue?, forKey: "Author")
+                            record.setObject(file.journal as CKRecordValue?, forKey: "Journal")
+                            record.setObject(file.groups as CKRecordValue?, forKey: "Group")
+                            
+                            self.privateDatabase?.save(record, completionHandler:( { savedRecord, error in
+                                DispatchQueue.main.async {
+                                    if let error = error {
+                                        print("accountStatus error: \(error)")
+                                    } else {
+                                        print("1. Updated record: " + file.filename)
                                     }
-                                }))
-                                
-                            }
+                                    self.activityIndicator.stopAnimating()
+                                }
+                            }))
+                            
                         }
-                    } else {
-                        // ADD FILE TO ICLOUD
-                        if let zoneID = self.recordZone?.zoneID {
-                            let myRecord = CKRecord(recordType: self.categories[self.selectedCategoryNumber], zoneID: zoneID)
-                            switch self.categories[self.selectedCategoryNumber] {
-                            case "Publications":
-                                
-                                var groups = [String]()
-                                for group in currentPublication.publicationGroup?.allObjects as! [PublicationGroup] {
-                                    groups.append(group.tag!)
-                                }
-                                
-                                myRecord.setObject(currentPublication.filename as CKRecordValue?, forKey: "Filename")
-                                myRecord.setObject(currentPublication.author?.name as CKRecordValue?, forKey: "Author")
-                                myRecord.setObject(groups as CKRecordValue?, forKey: "Group")
-                                myRecord.setObject(Int(currentPublication.rank) as CKRecordValue?, forKey: "Rank")
-                                myRecord.setObject(currentPublication.year as CKRecordValue?, forKey: "Year")
-                                myRecord.setObject(currentPublication.note as CKRecordValue?, forKey: "Note")
-                                myRecord.setObject(currentPublication.title as CKRecordValue?, forKey: "Title")
-                                myRecord.setObject(currentPublication.favorite as CKRecordValue?, forKey: "Favorite")
-                                
-                                let modifyRecordsOperation = CKModifyRecordsOperation(recordsToSave: [myRecord], recordIDsToDelete: nil)
-                                let configuration = CKOperationConfiguration()
-                                configuration.timeoutIntervalForRequest = 10
-                                configuration.timeoutIntervalForResource = 10
-                                
-                                modifyRecordsOperation.configuration = configuration
-                                modifyRecordsOperation.modifyRecordsCompletionBlock =
-                                    { records, recordIDs, error in
-                                        if let err = error {
-                                            print(err)
-                                        } else {
-                                            DispatchQueue.main.async {
-                                                print(currentPublication.filename! + " successfully added to icloud database")
-                                            }
-                                            self.currentRecord = myRecord
+                    }
+                } else {
+                    // ADD FILE TO ICLOUD
+                    if let zoneID = self.recordZone?.zoneID {
+                        let myRecord = CKRecord(recordType: self.categories[self.selectedCategoryNumber], zoneID: zoneID)
+                        switch self.categories[self.selectedCategoryNumber] {
+                        case "Publications":
+                            
+//                            var groups = [String]()
+//                            for group in currentPublication.publicationGroup?.allObjects as! [PublicationGroup] {
+//                                groups.append(group.tag!)
+//                            }
+                            
+                            myRecord.setObject(file.filename as CKRecordValue?, forKey: "Filename")
+                            myRecord.setObject(file.author as CKRecordValue?, forKey: "Author")
+                            myRecord.setObject(file.journal as CKRecordValue?, forKey: "Journal")
+                            myRecord.setObject(file.groups as CKRecordValue?, forKey: "Group")
+                            myRecord.setObject(Int(file.rank!) as CKRecordValue?, forKey: "Rank")
+                            myRecord.setObject(file.year as CKRecordValue?, forKey: "Year")
+                            myRecord.setObject(file.note as CKRecordValue?, forKey: "Note")
+                            myRecord.setObject(file.favorite as CKRecordValue?, forKey: "Favorite")
+                            
+                            let modifyRecordsOperation = CKModifyRecordsOperation(recordsToSave: [myRecord], recordIDsToDelete: nil)
+                            let configuration = CKOperationConfiguration()
+                            configuration.timeoutIntervalForRequest = 10
+                            configuration.timeoutIntervalForResource = 10
+                            
+                            modifyRecordsOperation.configuration = configuration
+                            modifyRecordsOperation.modifyRecordsCompletionBlock =
+                                { records, recordIDs, error in
+                                    if let err = error {
+                                        print(err)
+                                    } else {
+                                        DispatchQueue.main.async {
+                                            print(file.filename + " successfully added to icloud database")
+                                            self.activityIndicator.stopAnimating()
                                         }
-                                }
-                                self.privateDatabase?.add(modifyRecordsOperation)
-                            default:
-                                print("101")
+                                        self.currentRecord = myRecord
+                                    }
                             }
+                            self.privateDatabase?.add(modifyRecordsOperation)
+                        default:
+                            print("101")
                         }
                     }
                 }
             }
         }
-        
-//        if recordFound == false {
-//            // ADD FILE TO ICLOUD
-//            if let zoneID = recordZone?.zoneID {
-//                let myRecord = CKRecord(recordType: categories[selectedCategoryNumber], zoneID: zoneID)
-//                switch categories[selectedCategoryNumber] {
-//                case "Publications":
-//
-//                    var groups = [String]()
-//                    for group in currentPublication.publicationGroup?.allObjects as! [PublicationGroup] {
-//                        groups.append(group.tag!)
-//                    }
-//
-//                    myRecord.setObject(currentPublication.filename as CKRecordValue?, forKey: "Filename")
-//                    myRecord.setObject(currentPublication.author?.name as CKRecordValue?, forKey: "Author")
-//                    myRecord.setObject(groups as CKRecordValue?, forKey: "Group")
-//                    myRecord.setObject(currentPublication.rank as CKRecordValue?, forKey: "Rank")
-//                    myRecord.setObject(currentPublication.year as CKRecordValue?, forKey: "Year")
-//                    myRecord.setObject(currentPublication.note as CKRecordValue?, forKey: "Note")
-//                    myRecord.setObject(currentPublication.title as CKRecordValue?, forKey: "Title")
-//                    myRecord.setObject(currentPublication.favorite as CKRecordValue?, forKey: "Favorite")
-//
-//                    let modifyRecordsOperation = CKModifyRecordsOperation(recordsToSave: [myRecord], recordIDsToDelete: nil)
-//                    let configuration = CKOperationConfiguration()
-//                    configuration.timeoutIntervalForRequest = 10
-//                    configuration.timeoutIntervalForResource = 10
-//
-//                    modifyRecordsOperation.configuration = configuration
-//                    modifyRecordsOperation.modifyRecordsCompletionBlock =
-//                        { records, recordIDs, error in
-//                            if let err = error {
-//                                print(err)
-//                            } else {
-//                                DispatchQueue.main.async {
-//                                    print(currentPublication.filename! + " successfully added to icloud database")
-//                                }
-//                                self.currentRecord = myRecord
-//                            }
-//                    }
-//                    privateDatabase?.add(modifyRecordsOperation)
-//                default:
-//                    print("101")
-//                }
-//            }
-//
-//        }
-        activityIndicator.stopAnimating()
     }
     
     func loadIcloudData() {
         if icloudAvailable {
             // GET PUBLICATIONS
             let query = CKQuery(recordType: "Publications", predicate: NSPredicate(value: true))
-            privateDatabase?.perform(query, inZoneWith: nil) { (records, error) in
+            privateDatabase?.perform(query, inZoneWith: recordZone?.zoneID) { (records, error) in
                 guard let records = records else {return}
                 DispatchQueue.main.async {
                     self.activityIndicator.startAnimating()
                     for record in records {
                         let thumbnail = self.getThumbnail(url: self.publicationsURL.appendingPathComponent(record.object(forKey: "Filename") as! String), pageNumber: 0)
-                        let newPublication = PublicationFile(filename: record.object(forKey: "Filename") as! String, title: record.object(forKey: "Title") as? String, year: record.object(forKey: "Year") as? Int16, thumbnails: [thumbnail], category: "Publication", rank: record.object(forKey: "Rank") as? Float, note: record.object(forKey: "Note") as? String, dateCreated: record.creationDate, dateModified: record.modificationDate, favorite: record.object(forKey: "Favorite") as? String, author: record.object(forKey: "Author") as? String, groups: record.object(forKey: "Group") as! [String?])
+                        let newPublication = PublicationFile(filename: record.object(forKey: "Filename") as! String, title: record.object(forKey: "Title") as? String, year: record.object(forKey: "Year") as? Int16, thumbnails: [thumbnail], category: "Publication", rank: record.object(forKey: "Rank") as? Float, note: record.object(forKey: "Note") as? String, dateCreated: record.creationDate, dateModified: record.modificationDate, favorite: record.object(forKey: "Favorite") as? String, author: record.object(forKey: "Author") as? String, journal: record.object(forKey: "Journal") as? String, groups: record.object(forKey: "Group") as! [String?])
                         self.publicationsIC.append(newPublication)
                         print(record.object(forKey: "Filename") as! String)
                     }
@@ -1025,6 +1008,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                 }
             }
         } else {
+            print("Icloud not available")
             compareLocalFilesWithDatabase()
             populateListTable()
             populateFilesCV()
@@ -1039,6 +1023,8 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     }
 
     func readIcloudDriveFolders() {
+        localFiles = [[]]
+
         for type in categories{
             switch type {
             case "Publications":
@@ -1050,56 +1036,33 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                         var filename = String()
                         var available = true
                         if file.lastPathComponent.range(of:".icloud") != nil {
-                            thumbnail = #imageLiteral(resourceName: "fileIcon.png")
+                            thumbnail = #imageLiteral(resourceName: "FileOffline")
                             available = false
+                            print(file.lastPathComponent)
                             filename = file.deletingPathExtension().lastPathComponent
                             filename.remove(at: filename.startIndex)
                         } else {
                             thumbnail = getThumbnail(url: file, pageNumber: 0)
                             filename = file.lastPathComponent
                         }
-                        let newFile = LocalFile(label: file.lastPathComponent, thumbnail: thumbnail, favorite: "No", filename: filename, url: file, title: "No title", year: -2000, category: "Publication", rank: 50, note: "No notes", dateCreated: Date(), dateModified: Date(), author: "No author", groups: ["All publications"], parentFolder: nil, available: available)
+                        let newFile = LocalFile(label: file.lastPathComponent, thumbnail: thumbnail, favorite: "No", filename: filename, url: file, title: "No title", journal: "No journal", year: -2000, category: "Publication", rank: 50, note: "No notes", dateCreated: Date(), dateModified: Date(), author: "No author", groups: ["All publications"], parentFolder: nil, available: available, filetype: nil)
                         localFiles[0].append(newFile)
                     }
                 } catch {
                     print("Error while enumerating files \(publicationsURL.path): \(error.localizedDescription)")
                 }
             case "Manuscripts":
-                let fileManager = FileManager.default
-                do {
-                    let folderURLs = try fileManager.contentsOfDirectory(at: manuscriptsURL!, includingPropertiesForKeys: nil)
-                    localFiles.append([])
-                    for folders in folderURLs {
-                        let fileURLs = try fileManager.contentsOfDirectory(at: folders, includingPropertiesForKeys: nil)
-                        for file in fileURLs {
-                            var thumbnail = UIImage()
-                            var filename = String()
-                            var available = true
-                            if file.lastPathComponent.range(of:".icloud") != nil {
-                                thumbnail = #imageLiteral(resourceName: "fileIcon.png")
-                                available = false
-                                filename = file.deletingPathExtension().lastPathComponent
-                                filename.remove(at: filename.startIndex)
-                            } else {
-                                thumbnail = getThumbnail(url: file, pageNumber: 0)
-                            }
-                            let newFile = LocalFile(label: file.lastPathComponent, thumbnail: thumbnail, favorite: "No", filename: file.lastPathComponent, url: file, title: nil, year: nil, category: "Manuscripts", rank: nil, note: "No notes", dateCreated: Date(), dateModified: Date(), author: nil, groups: [nil], parentFolder: folders.lastPathComponent, available: available)
-                            localFiles[1].append(newFile)
-                        }
-                    }
-                } catch {
-                    print("Error while reading manuscript folders")
-                }
-//            case "Presentations":
-//                print("Presentations 101")
-//            case "Proposals":
-//                print("Proposals 101")
-//            case "Supervision":
-//                print("Supervision 101")
-//            case "Teaching":
-//                print("Teaching 101")
-//            case "Patents":
-//                print("Patents 101")
+                readFilesInFolders(url: manuscriptsURL, type: type, number: 1)
+            case "Presentations":
+                readFilesInFolders(url: presentationsURL, type: type, number: 2)
+            case "Proposals":
+                readFilesInFolders(url: proposalsURL, type: type, number: 3)
+            case "Supervision":
+                readFilesInFolders(url: proposalsURL, type: type, number: 4)
+            case "Teaching":
+                readFilesInFolders(url: proposalsURL, type: type, number: 5)
+            case "Patents":
+                readFilesInFolders(url: proposalsURL, type: type, number: 6)
             default:
                 print("Default 122")
             }
@@ -1111,7 +1074,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         case "Publications":
             
             let query = CKQuery(recordType: "Publications", predicate: NSPredicate(value: true))
-            privateDatabase?.perform(query, inZoneWith: nil) { (records, error) in
+            privateDatabase?.perform(query, inZoneWith: recordZone?.zoneID) { (records, error) in
                 guard let records = records else {return}
                 DispatchQueue.main.async {
                     for record in records {
@@ -1155,13 +1118,17 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         } else {
             currentTheme = 0
         }
-        print(currentTheme)
+        if let settings = kvStorage.object(forKey: "annotationSettings") as? [Int] {
+            annotationSettings = settings
+        } else {
+            annotationSettings = [0, 0, 0, 0]
+        }
         
-        //        if let number = kvStorage.array(forKey: "selectedCategory") as? Int {
-        //            selectedCategoryNumber = number
-        //        } else {
-        //            selectedCategoryNumber = 0
-        //        }
+        if let number = kvStorage.array(forKey: "selectedCategory") as? Int {
+            selectedCategoryNumber = number
+        } else {
+            selectedCategoryNumber = 0
+        }
         //        kvStorage.longLong(forKey: "selectedSubtable")
         //        if let number = kvStorage.array(forKey: "selectedSubtable") as? Int {
         //            selectedSubtableNumber = number
@@ -1174,42 +1141,75 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         
     }
     
+    func readFilesInFolders(url: URL, type: String, number: Int) {
+        let fileManager = FileManager.default
+        do {
+            let folderURLs = try fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
+            localFiles.append([])
+            for folders in folderURLs {
+                let fileURLs = try fileManager.contentsOfDirectory(at: folders, includingPropertiesForKeys: nil)
+                for file in fileURLs {
+                    var thumbnail = UIImage()
+                    var filename = String()
+                    var available = true
+                    if file.lastPathComponent.range(of:".icloud") != nil {
+                        thumbnail = #imageLiteral(resourceName: "fileIcon.png")
+                        available = false
+                        filename = file.deletingPathExtension().lastPathComponent
+                        filename.remove(at: filename.startIndex)
+                    } else {
+                        thumbnail = getThumbnail(url: file, pageNumber: 0)
+                    }
+                    let newFile = LocalFile(label: file.lastPathComponent, thumbnail: thumbnail, favorite: "No", filename: file.lastPathComponent, url: file, title: nil, journal: nil, year: nil, category: type, rank: nil, note: "No notes", dateCreated: Date(), dateModified: Date(), author: nil, groups: [nil], parentFolder: folders.lastPathComponent, available: available, filetype: "Miscellaneous")
+                    localFiles[number].append(newFile)
+                }
+            }
+        } catch {
+            print("Error while reading " + type + " folders")
+        }
+    }
     
     
     // MARK: - STORYBOARD FUNCTIONS
     
     func updateLocalFiles() -> LocalFile? {
-        for i in 0..<localFiles[selectedCategoryNumber].count {
-            if localFiles[selectedCategoryNumber][i].filename == filenameString.text {
-                
-                localFiles[selectedCategoryNumber][i].dateModified = Date()
-                localFiles[selectedCategoryNumber][i].rank = rankOutlet.value
-                
-                if (titleString.text?.isEmpty)! {
-                    localFiles[selectedCategoryNumber][i].title = "No title"
-                } else {
-                    localFiles[selectedCategoryNumber][i].title = titleString.text
+        switch categories[selectedCategoryNumber] {
+        case "Publications":
+            for i in 0..<localFiles[0].count {
+                if localFiles[0][i].filename == filenameString.text {
+                    
+                    localFiles[0][i].dateModified = Date()
+                    localFiles[0][i].rank = rankOutlet.value
+                    
+                    if (journalString.text?.isEmpty)! {
+                        localFiles[0][i].journal = "No journal"
+                    } else {
+                        localFiles[0][i].journal = journalString.text
+                    }
+                    
+                    if (yearString.text?.isEmpty)! {
+                        localFiles[0][i].year = -2000
+                    } else {
+                        localFiles[0][i].year = isStringAnInt(stringNumber: yearString.text!)
+                    }
+                    
+                    if (notesString.text?.isEmpty)! {
+                        localFiles[0][i].note = "No note"
+                    } else {
+                        localFiles[0][i].note = notesString.text
+                    }
+                    
+                    if (authorString.text?.isEmpty)! {
+                        localFiles[0][i].author = "No author"
+                    } else {
+                        localFiles[0][i].author = authorString.text
+                    }
+                    print("Updated local file: " + localFiles[0][i].filename)
+                    return localFiles[0][i]
                 }
-                if (yearString.text?.isEmpty)! {
-                    localFiles[selectedCategoryNumber][i].year = -2000
-                } else {
-                    localFiles[selectedCategoryNumber][i].year = isStringAnInt(stringNumber: yearString.text!)
-                }
-                
-                if (notesTextView.text?.isEmpty)! {
-                    localFiles[selectedCategoryNumber][i].note = "No note"
-                } else {
-                    localFiles[selectedCategoryNumber][i].note = notesTextView.text
-                }
-                
-                if (authorString.text?.isEmpty)! {
-                    localFiles[selectedCategoryNumber][i].author = "No author"
-                } else {
-                    localFiles[selectedCategoryNumber][i].author = authorString.text
-                }
-                print("Updated local file: " + localFiles[selectedCategoryNumber][i].filename)
-                return localFiles[selectedCategoryNumber][i]
             }
+        default:
+            return nil
         }
         return nil
     }
@@ -1234,14 +1234,36 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                 currentPublication.author = authorsCD.first(where: {$0.name == file.author})
             }
             
+            if journalsCD.first(where: {$0.name == file.journal}) == nil {
+                let newJournal = Journal(context: context)
+                newJournal.name = journalString.text
+                newJournal.sortNumber = "1"
+                print("Added new journal: " + newJournal.name!)
+                currentPublication.journal = newJournal
+            } else {
+                currentPublication.journal = journalsCD.first(where: {$0.name == file.journal})
+                print("Added to journal: " + (currentPublication.journal?.name)!)
+            }
+
             for group in file.groups {
                 if let tmp = publicationGroupsCD.first(where: {$0.tag == group}) {
                     currentPublication.addToPublicationGroup(tmp) //Assume (for now) that all groups can be found in publicationGroupsCD
+                } else {
+                    let newGroup = PublicationGroup(context: context)
+                    newGroup.tag = group
+                    newGroup.sortNumber = "3"
+                    newGroup.dateModified = Date()
+                    print("Added new group: " + newGroup.tag!)
+                    currentPublication.addToPublicationGroup(newGroup)
                 }
             }
             
             saveCoreData()
             loadCoreData()
+            
+            print(currentPublication.filename)
+            print(currentPublication.journal?.name)
+//            print(currentPublication.journal?.name)
             
         } else {
             // A FILE FOUND IN FOLDER BUT NOT SAVED INTO CORE DATA
@@ -1282,19 +1304,38 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             mainView.backgroundColor = UIColor(red: 0, green: 0, blue: 1, alpha: 1)
             categoriesCV.backgroundColor = UIColor(red: 0, green: 0, blue: 1, alpha: 1)
             notesView.backgroundColor = UIColor(red: 0, green: 0, blue: 1, alpha: 1)
+            selectedCategoryTitle.backgroundColor = UIColor(red: 146/255, green: 144/255, blue: 0, alpha: 1)
+            selectedCategoryTitle.textColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+            segmentedControllTablesOrNotes.tintColor = UIColor(red: 146/255, green: 144/255, blue: 0, alpha: 1)
+            segmentedControllTablesOrNotes.backgroundColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
         case 1:
             mainView.backgroundColor = UIColor(red: 1, green: 0, blue: 0, alpha: 1)
             categoriesCV.backgroundColor = UIColor(red: 1, green: 0, blue: 0, alpha: 1)
             notesView.backgroundColor = UIColor(red: 1, green: 0, blue: 0, alpha: 1)
+            notesView.tintColor = UIColor(red: 0, green: 0, blue: 0, alpha: 1)
+            selectedCategoryTitle.backgroundColor = UIColor(red: 0, green: 0, blue: 1, alpha: 1)
+            selectedCategoryTitle.textColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+            segmentedControllTablesOrNotes.tintColor = UIColor(red: 0, green: 0, blue: 1, alpha: 1)
+            segmentedControllTablesOrNotes.backgroundColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
         case 2:
             mainView.backgroundColor = UIColor(red: 0, green: 0, blue: 0, alpha: 1)
             categoriesCV.backgroundColor = UIColor(red: 0, green: 0, blue: 0, alpha: 1)
             notesView.backgroundColor = UIColor(red: 0, green: 0, blue: 0, alpha: 1)
+            notesView.tintColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+            selectedCategoryTitle.backgroundColor = UIColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 1)
+            selectedCategoryTitle.textColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+            segmentedControllTablesOrNotes.tintColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+            segmentedControllTablesOrNotes.backgroundColor = UIColor(red: 0, green: 0, blue: 0, alpha: 1)
+            
         default:
             mainView.backgroundColor = UIColor(red: 0, green: 0, blue: 1, alpha: 1)
             categoriesCV.backgroundColor = UIColor(red: 0, green: 0, blue: 1, alpha: 1)
-            notesView.backgroundColor = UIColor(red: 0, green: 0, blue: 1, alpha: 1)
+            notesView.backgroundColor = UIColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 1)
+            notesView.tintColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+            selectedCategoryTitle.backgroundColor = UIColor(red: 146/255, green: 144/255, blue: 0, alpha: 1)
+            selectedCategoryTitle.textColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
         }
+        filesCollectionView.reloadData()
     }
     
     func populateListTable() {
@@ -1310,6 +1351,10 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             case "Author":
                 let tmp = authorsCD.sorted(by: {($0.sortNumber!, $0.name!) < ($1.sortNumber!, $1.name!)})
                 sortTableTitles = tmp.map { $0.name! }
+            case "Journal":
+                let tmp = journalsCD.sorted(by: {($0.sortNumber!, $0.name!) < ($1.sortNumber!, $1.name!)})
+                sortTableTitles = tmp.map { $0.name! }
+                print(sortTableTitles)
             case "Rank":
                 sortTableTitles = ["0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80-89", "90-99", "100"]
             default:
@@ -1336,7 +1381,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         filesCV = [[]]
         
         switch categories[selectedCategoryNumber] {
-        case "Publications":
+        case "Publications": //LocalFiles[0]
             switch sortSubtableStrings[sortSubtableNumbers[selectedSubtableNumber]] {
             case "Tag":
                 for i in 0..<sortTableTitles.count {
@@ -1353,6 +1398,20 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                 for i in 0..<sortTableTitles.count {
                     for file in localFiles[0] {
                         if file.author == sortTableTitles[i] {
+                            filesCV[i].append(file)
+                        }
+                    }
+                    if i < sortTableTitles.count {
+                        filesCV.append([]) // ADD [] FOR THE NEXT ROUND
+                    }
+                }
+            case "Journal":
+                for i in 0..<sortTableTitles.count {
+                    for file in localFiles[0] {
+                        if file.journal == sortTableTitles[i] {
+//                            print(i)
+//                            print(file.filename)
+//                            print(file.journal)
                             filesCV[i].append(file)
                         }
                     }
@@ -1393,20 +1452,106 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                 print("Default 132")
             }
             
-        case "Manuscripts":
+        case "Manuscripts": //localFiles[1]
             filesCV = [[]]
 
-            for i in 0..<sortTableTitles.count {
-                for file in localFiles[1] {
-                    if file.parentFolder == sortTableTitles[i] {
-                        filesCV[i].append(file)
+            switch sortSubtableStrings[sortSubtableNumbers[selectedCategoryNumber]] {
+            case "Normal view":
+                for i in 0..<sortTableTitles.count {
+                    for file in localFiles[1] {
+                        if file.parentFolder == sortTableTitles[i] {
+                            filesCV[i].append(file)
+                        }
+                    }
+                    if i < sortTableTitles.count {
+                        filesCV.append([]) // ADD [] FOR THE NEXT ROUND
                     }
                 }
-                if i < sortTableTitles.count {
-                    filesCV.append([]) // ADD [] FOR THE NEXT ROUND
+            case "Focused view":
+
+                manuscriptSections = ["Microsoft word", "PDF documents", "Figures", "Presentations", "Matlab files", "Excel", "Miscellaneous"]
+                
+                for _ in 0..<manuscriptSections.count {
+                    filesCV.append([])
                 }
+
+                //FIX: NOT FINISHED HERE
+                for file in localFiles[1] {
+                    if file.parentFolder == sortTableTitles[selectedSubtableNumber] {
+                        let components = file.filename.components(separatedBy: ".")
+                        
+                        switch components.last {
+                        case "doc", "docx": //Microsoft word
+                            filesCV[0].append(file)
+                        case "pdf": //PDFs
+                            filesCV[1].append(file)
+                        case "jpg", "ai", "png": //Figures
+                            filesCV[2].append(file)
+                        case "ppt": //Presentations
+                            filesCV[3].append(file)
+                        case "m": //Matlab
+                            filesCV[4].append(file)
+                        case "ppx": //Excel
+                            filesCV[5].append(file)
+                        default: //Miscellaneous
+                            filesCV[6].append(file)
+                        }
+                    }
+                }
+            default:
+                print("Default 138")
             }
-        
+            
+        case "Proposals": //localFiles[3]
+            filesCV = [[]]
+            
+            switch sortSubtableStrings[sortSubtableNumbers[selectedCategoryNumber]] {
+            case "Normal view":
+                for i in 0..<sortTableTitles.count {
+                    for file in localFiles[3] {
+                        if file.parentFolder == sortTableTitles[i] {
+                            filesCV[i].append(file)
+                        }
+                    }
+                    if i < sortTableTitles.count {
+                        filesCV.append([]) // ADD [] FOR THE NEXT ROUND
+                    }
+                }
+            case "Focused view":
+                
+                proposalsSections = ["Microsoft word", "PDF documents", "Figures", "Presentations", "Matlab files", "Excel", "Miscellaneous"]
+                
+                for _ in 0..<manuscriptSections.count {
+                    filesCV.append([])
+                }
+                
+                //FIX: NOT FINISHED HERE
+                for file in localFiles[1] {
+                    if file.parentFolder == sortTableTitles[selectedSubtableNumber] {
+                        let components = file.filename.components(separatedBy: ".")
+                        
+                        switch components.last {
+                        case "doc", "docx": //Microsoft word
+                            filesCV[0].append(file)
+                        case "pdf": //PDFs
+                            filesCV[1].append(file)
+                        case "jpg", "ai", "png": //Figures
+                            filesCV[2].append(file)
+                        case "ppt": //Presentations
+                            filesCV[3].append(file)
+                        case "m": //Matlab
+                            filesCV[4].append(file)
+                        case "ppx": //Excel
+                            filesCV[5].append(file)
+                        default: //Miscellaneous
+                            filesCV[6].append(file)
+                        }
+                    }
+                }
+            default:
+                print("Default 138")
+            }
+            
         default:
             print("Default 133")
         }
@@ -1423,7 +1568,20 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         return yearsString
     }
 
+    
+    
+    
+    
     // MARK: - CORE DATA FUNCTIONS
+    func saveCoreData() {
+        do {
+            try context.save()
+            print("Saved to core data")
+        } catch {
+            alert(title: "Error saving", message: "Could not save core data")
+        }
+    }
+    
     func loadCoreData() {
 
         let requestPublicationGroups: NSFetchRequest<PublicationGroup> = PublicationGroup.fetchRequest()
@@ -1440,6 +1598,14 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             authorsCD = try context.fetch(requestAuthors)
         } catch {
             print("Error loading authors")
+        }
+
+        let requestJournals: NSFetchRequest<Journal> = Journal.fetchRequest()
+        requestJournals.sortDescriptors = [NSSortDescriptor(key: "name", ascending: true)]
+        do {
+            journalsCD = try context.fetch(requestJournals)
+        } catch {
+            print("Error loading journals")
         }
 
         let request: NSFetchRequest<Publication> = Publication.fetchRequest()
@@ -1462,6 +1628,15 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             saveCoreData()
         }
         
+        // ADD "NO JOURNAL"
+        let arrayJournals = journalsCD
+        if arrayJournals.first(where: {$0.name == "No journal"}) == nil {
+            let newJournal = Journal(context: context)
+            newJournal.name = "No journal"
+            newJournal.sortNumber = "0"
+            saveCoreData()
+        }
+
         // ADD "ALL PUBLICATIONS"
         let arrayPublicationGroups = publicationGroupsCD
         if arrayPublicationGroups.first(where: {$0.tag == "All publications"}) == nil {
@@ -1471,15 +1646,6 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             newPublicationGroup.sortNumber = "0"
             saveCoreData()
         }
-        
-//        // ADD "UNFILED ARTICLES"
-//        if publicationGroupsCD.first(where: {$0.tag == "Unfiled"}) == nil {
-//            let unfiledGroup = PublicationGroup(context: context)
-//            unfiledGroup.tag = "Unfiled"
-//            unfiledGroup.dateModified = Date()
-//            unfiledGroup.sortNumber = "1"
-//            saveCoreData()
-//        }
 
         // ADD "FAVORITES"
         if publicationGroupsCD.first(where: {$0.tag == "Favorites"}) == nil {
@@ -1493,37 +1659,12 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         loadCoreData()
     }
 
-    func addOrRemoveFromUnfiledGroup() {
-//        let unfiledGroup = publicationGroupsCD.first(where: {$0.tag! == "Unfiled"})
-        
-        let standardGroups = ["All publications", "Unfiled", "Favorites"]
-        for file in localFiles[0] {
-            var keep = true
-            if (file.groups.contains(standardGroups[0]) && file.groups.contains(standardGroups[1]) && file.groups.count > 2) {
-                for group in file.groups {
-                    if group != "Favorites" {
-                        keep = false
-                        print(file.filename)
-                    }
-                }
-            }
-        }
-        
-        
-//        if (article.articleGroup?.count)! > 1 {
-//            if (article.articleGroup?.contains(unfiled))! {
-//                article.removeFromArticleGroup(unfiled!)
-//            }
-//        }
-//        if (article.articleGroup?.count)! == 1 {
-//            article.addToArticleGroup(unfiled!)
-//        }
-    }
+    
+    
     
     
     
     // MARK: - GENERAL FUNCTIONS
-    
     func setupUI() {
 
         privateDatabase = container().privateCloudDatabase
@@ -1542,12 +1683,14 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         
         
         kvStorage = NSUbiquitousKeyValueStore()
-//        loadDefaultValues()
+        loadDefaultValues()
         
-        self.focusedViewButton.isHidden = true
-        self.focusedViewText.isHidden = true
-
+//        journalString.addTarget(self, action: #selector(textFieldDidChange(_:)), for: .editingChanged)
+        
         readIcloudDriveFolders()
+        
+        setSortTableListStrings()
+        setFilesCVSortingStrings()
         
         loadCoreData()
         setupDefaultCoreDataTypes()
@@ -1555,6 +1698,34 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         
         setThemeColor()
         
+    }
+    
+    func updateDatabasesWithNewFileInformation() {
+        activityIndicator.startAnimating()
+        switch categories[selectedCategoryNumber] {
+        case "Publications":
+            
+            // UPDATING LOCALFILES
+            let currentFile = updateLocalFiles()
+            
+            // UPDATING CORE DATA
+            updateCoreData(file: currentFile!)
+            
+            // UPDATING ICLOUD
+            updateIcloud(file: currentFile!)
+
+            populateListTable()
+            populateFilesCV()
+            sortItems()
+            listTableView.reloadData()
+            filesCollectionView.reloadData()
+//        case "Manuscripts":
+//            // UPDATING LOCALFILES
+//            let currentFile = updateLocalFiles()
+
+        default:
+            print("Default 137")
+        }
     }
     
     func compareLocalFilesWithDatabase() {
@@ -1588,77 +1759,28 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             
             if icloudMatch && coreDataMatch {
                 if coreDataFile.dateModified! > icloudFile.dateModified! {
+                    print("Load 1")
                     updateLocalFilesWithCoreData(index: i, category: selectedCategoryNumber, coreDataFile: coreDataFile)
                 } else {
+                    print("Load 2")
                     updateLocalFilesWithIcloud(index: i, category: selectedCategoryNumber, icloudFile: icloudFile)
                 }
             } else {
                 if icloudMatch || coreDataMatch {
                     if icloudMatch {
+                        print("Load 3")
                         updateLocalFilesWithIcloud(index: i, category: selectedCategoryNumber, icloudFile: icloudFile)
                     } else {
+                        print("Load 4")
                         updateLocalFilesWithCoreData(index: i, category: selectedCategoryNumber, coreDataFile: coreDataFile)
                     }
                 } else {
-                    updateCoreDataWithLocalFiles(index: i, category: selectedCategoryNumber)
+                    print("Load 5")
+                    addFileToCoreData(file: localFiles[0][i])
                 }
             }
 
             
-        }
-    }
-    
-    func updateCoreDataWithLocalFiles(index: Int, category: Int) {
-        switch category {
-        case 0:
-            let newPublication = Publication(context: context)
-            
-            newPublication.filename = localFiles[category][index].filename
-            newPublication.thumbnail = localFiles[category][index].thumbnail
-            newPublication.dateCreated = localFiles[category][index].dateCreated!
-            newPublication.dateModified = localFiles[category][index].dateModified!
-            newPublication.title = localFiles[category][index].title!
-            newPublication.year = localFiles[category][index].year!
-            newPublication.note = localFiles[category][index].note!
-            
-            let noAuthor = authorsCD.first(where: {$0.name == "No author"})
-            if localFiles[category][index].author == "No author" {
-                newPublication.author = noAuthor
-            } else {
-                if authorsCD.first(where: {$0.name == localFiles[category][index].author}) == nil {
-                    let newAuthor = Author(context: context)
-                    newAuthor.name = localFiles[category][index].author!
-                    newAuthor.sortNumber = "1"
-                    print("Added new author: " + newAuthor.name!)
-                    newPublication.author = newAuthor
-                } else {
-                    newPublication.author = authorsCD.first(where: {$0.name == localFiles[category][index].author})
-                }
-            }
-
-            newPublication.favorite = localFiles[category][index].favorite
-            
-            for group in localFiles[category][index].groups {
-                if publicationGroupsCD.first(where: {$0.tag == group}) == nil {
-                    let newGroup = PublicationGroup(context: context)
-                    newGroup.tag = group
-                    newGroup.sortNumber = "3"
-                    newGroup.dateModified = Date()
-                    print("Added new group: " + newGroup.tag!)
-                    newPublication.addToPublicationGroup(newGroup)
-                } else {
-                    newPublication.addToPublicationGroup(publicationGroupsCD.first(where: {$0.tag == group})!)
-                }
-            }
-            
-            publicationsCD.append(newPublication)
-            
-            saveCoreData()
-            loadCoreData()
-            
-            print("Saved " + newPublication.filename! + " to core data.")
-        default:
-            print("Default 132")
         }
     }
     
@@ -1667,23 +1789,48 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         case 0:
             let currentIcloudFile = icloudFile as! PublicationFile
             localFiles[category][index].year = currentIcloudFile.year
-            localFiles[category][index].title = currentIcloudFile.title!
+//            localFiles[category][index].title = currentIcloudFile.title!
             localFiles[category][index].rank = currentIcloudFile.rank
             localFiles[category][index].note = currentIcloudFile.note!
             localFiles[category][index].dateCreated = currentIcloudFile.dateCreated!
             localFiles[category][index].dateModified = currentIcloudFile.dateModified!
             localFiles[category][index].favorite = currentIcloudFile.favorite!
-            if authorsCD.first(where: {$0.name == currentIcloudFile.author}) == nil {
-                let newAuthor = Author(context: context)
-                newAuthor.name = currentIcloudFile.author
-                newAuthor.sortNumber = "1"
-                print("Added new author: " + newAuthor.name!)
-                saveCoreData()
-                loadCoreData()
+            
+            if currentIcloudFile.author != nil {
+                localFiles[category][index].author = currentIcloudFile.author!
+                if authorsCD.first(where: {$0.name == currentIcloudFile.author}) == nil {
+                    let newAuthor = Author(context: context)
+                    newAuthor.name = currentIcloudFile.author
+                    newAuthor.sortNumber = "1"
+                    print("Added new author: " + newAuthor.name!)
+                    saveCoreData()
+                    loadCoreData()
+                }
+            } else {
+                localFiles[category][index].author = "No author"
             }
-            localFiles[category][index].author = currentIcloudFile.author!
+            
+            
+            if currentIcloudFile.journal != nil {
+                localFiles[category][index].journal = currentIcloudFile.journal!
+                if journalsCD.first(where: {$0.name == currentIcloudFile.journal}) == nil {
+                    let newJournal = Journal(context: context)
+                    newJournal.name = currentIcloudFile.journal
+                    newJournal.sortNumber = "1"
+                    print("Added new journal: " + newJournal.name!)
+                    saveCoreData()
+                    loadCoreData()
+                }
+            } else {
+                localFiles[category][index].journal = "No journal"
+            }
+            
             localFiles[category][index].groups = currentIcloudFile.groups
             print("Icloud file: " + localFiles[category][index].filename)
+            
+            //Update Core data with just updated localFiles
+            updateCoreData(file: localFiles[category][index])
+            
         default:
             print("Default 131")
         }
@@ -1711,15 +1858,33 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             } else {
                 localFiles[category][index].author = "No author"
             }
+
+            if localFiles[category][index].filename == "Adrian2005.pdf" {
+                print(localFiles[category][index].journal)
+            }
+            
+            if let journal = currentCoreDataFile.journal?.name {
+                print(journal)
+                localFiles[category][index].journal = journal
+            } else {
+                print("No journal found")
+                localFiles[category][index].journal = "No journal"
+            }
+
+            if localFiles[category][index].filename == "Adrian2005.pdf" {
+                print(localFiles[category][index].journal)
+                print(currentCoreDataFile.journal?.name)
+            }
+
+            localFiles[category][index].favorite = "No"
             for group in currentCoreDataFile.publicationGroup?.allObjects as! [PublicationGroup] {
                 localFiles[category][index].groups.append(group.tag)
                 if group.tag == "Favorites" {
                     localFiles[category][index].favorite = "Yes"
-                    print("Favorite" + currentCoreDataFile.filename!)
-                } else {
-                    localFiles[category][index].favorite = "No"
                 }
             }
+            
+            
             
             print("Core data file: " + localFiles[category][index].filename)
         default:
@@ -1817,12 +1982,12 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                     
                     largeThumbnail.image = thumbnail
                     filenameString.text = url.lastPathComponent
-                    titleString.text = "No title"
+                    journalString.text = "No journal"
                     yearString.text = "-2000"
                     authorString.text = "No author"
-                    notesTextView.text = "No notes"
-                    rankOutlet.value = 50
-                    rankValue.text = "50"
+                    notesString.text = "No notes yet"
+                    rankOutlet.value = 0
+                    rankValue.text = "0"
                     documentPage = 0
                     
                     downloadFile(fileURL: url)
@@ -1886,6 +2051,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
 
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         if (segue.identifier == "segueSortCV") {
+            setFilesCVSortingStrings()
             let destination = segue.destination as! SortItemsViewController
             if sortCollectionViewNumbers[selectedCategoryNumber] > sortCollectionViewStrings.count {
                 sortCollectionViewNumbers[selectedCategoryNumber] = 0
@@ -1896,6 +2062,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             destination.popoverPresentationController?.sourceRect = sortCVButton.bounds
         }
         if (segue.identifier == "segueSortSubtable") {
+            setSortTableListStrings()
             let destination = segue.destination as! SortSubtableViewController
             if sortSubtableNumbers[selectedSubtableNumber] > sortSubtableStrings.count {
                 sortSubtableNumbers[selectedSubtableNumber] = 0
@@ -1909,6 +2076,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             let destination = segue.destination as! PDFViewController
             destination.document = PDFdocument
             destination.PDFfilename = PDFfilename
+            destination.pdfURL = publicationsURL
+            destination.annotationSettings = annotationSettings
+
         }
         if (segue.identifier == "segueSettingsCV") {
             let destination = segue.destination as! SettingsViewController
@@ -1934,7 +2104,15 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             newPublication.title = file.title
             newPublication.year = file.year!
             newPublication.note = file.note
-            newPublication.favorite = file.favorite
+            
+            let favoriteGroup = publicationGroupsCD.first(where: {$0.tag == "Favorites"})
+            if file.favorite == "Yes" {
+                newPublication.favorite = "Yes"
+                newPublication.addToPublicationGroup(favoriteGroup!)
+            } else {
+                newPublication.favorite = "No"
+                newPublication.removeFromPublicationGroup(favoriteGroup!)
+            }
 
             if authorsCD.first(where: {$0.name == file.author}) == nil {
                 let newAuthor = Author(context: context)
@@ -1948,13 +2126,35 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             } else {
                 newPublication.author = authorsCD.first(where: {$0.name == file.author})
             }
+            
+            if journalsCD.first(where: {$0.name == file.journal}) == nil {
+                let newJournal = Journal(context: context)
+                newJournal.name = journalString.text
+                newJournal.sortNumber = "1"
+                print("Added new journal: " + newJournal.name!)
+                newPublication.journal = newJournal
+                
+                saveCoreData()
+                loadCoreData()
+            } else {
+                newPublication.journal = journalsCD.first(where: {$0.name == file.journal})
+            }
 
             for group in file.groups {
                 if let tmp = publicationGroupsCD.first(where: {$0.tag == group}) {
-                    newPublication.addToPublicationGroup(tmp) //Assume (for now) that all groups can be found in publicationGroupsCD
+                    newPublication.addToPublicationGroup(tmp)
+                } else {
+                    let newGroup = PublicationGroup(context: context)
+                    newGroup.tag = group
+                    newGroup.dateModified = Date()
+                    newGroup.sortNumber = "3"
+                    print("Added new group: " + newGroup.tag!)
+                    newPublication.addToPublicationGroup(newGroup)
+                    
+                    saveCoreData()
+                    loadCoreData()
                 }
             }
-
             
             publicationsCD.append(newPublication)
             
@@ -1965,15 +2165,6 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             
         default:
             print("Error at saveFileToCoreData()")
-        }
-    }
-    
-    func saveCoreData() {
-        do {
-            try context.save()
-            print("Saved to core data")
-        } catch {
-            alert(title: "Error saving", message: "Could not save core data")
         }
     }
     
@@ -2038,46 +2229,73 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     }
     
     func assignPublicationToAuthor(filename: String, authorName: String) {
-        // PUBLICATIONS CORE DATA
-        if let author = authorsCD.first(where: {$0.name == authorName}) {
-            if let currentPublication = publicationsCD.first(where: {$0.filename == filename}) {
-                currentPublication.author = author
-                saveCoreData()
-                loadCoreData()
-                updateIcloud(file: currentPublication)
-            }
-        } else {
-            let newAuthor = Author(context: context)
-            newAuthor.name = authorName
-            newAuthor.sortNumber = "1"
-            print("Added new author: " + authorName)
-        }
         
         // LOCAL FILES
         for i in 0..<localFiles[0].count {
             if localFiles[0][i].filename == filename {
                 localFiles[0][i].author = authorName
+                updateIcloud(file: localFiles[0][i])
+                updateCoreData(file: localFiles[0][i])
             }
+        }
+        
+    }
+    
+    func assignPublicationToJournal(filename: String, journalName: String) {
+
+        switch categories[selectedCategoryNumber] {
+        case "Publications":
+
+            // LOCAL FILES
+            for i in 0..<localFiles[0].count {
+                if localFiles[0][i].filename == filename {
+                    localFiles[0][i].journal = journalName
+                    
+                    updateIcloud(file: localFiles[0][i])
+                    updateCoreData(file: localFiles[0][i])
+                }
+            }
+        default:
+            print("Default 142")
         }
     }
     
     func addPublicationToGroup(filename: String, group: PublicationGroup) {
-        // PUBLICATIONS CORE DATA
-        if let publication = publicationsCD.first(where: {$0.filename == filename}) {
-            group.addToPublication(publication)
-            saveCoreData()
-            loadCoreData()
-            updateIcloud(file: publication)
-        }
-        
-        // LOCAL FILES
+        // LOCAL FILES & iCLOUD
         for i in 0..<localFiles[0].count {
             if localFiles[0][i].filename == filename {
                 localFiles[0][i].groups.append(group.tag)
+                updateIcloud(file: localFiles[0][i])
+                updateCoreData(file: localFiles[0][i])
             }
+        }
+    }
+    
+    func setSortTableListStrings() {
+        switch categories[selectedCategoryNumber] {
+        case "Publications":
+            sortSubtableStrings = ["Tag", "Author", "Journal", "Year", "Rank"]
+        case "Manuscripts":
+            sortSubtableStrings = ["Normal view", "Focused view"]
+        default:
+            sortSubtableStrings = ["Normal view", "Focused view"]
+        }
+
+    }
+    
+    func setFilesCVSortingStrings() {
+        switch categories[selectedCategoryNumber] {
+        case "Publications":
+            sortCollectionViewStrings = ["Filename", "Author", "Journal", "Year", "Rank"]
+        case "Manuscripts":
+            sortCollectionViewStrings = ["Filename", "Rank"]
+        default:
+            sortCollectionViewStrings = ["Filename", "Rank"]
         }
         
     }
+    
+    
     
     
     
@@ -2090,6 +2308,8 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             case "Tag":
                 return sortTableTitles.count
             case "Author":
+                return sortTableTitles.count
+            case "Journal":
                 return sortTableTitles.count
             case "Year":
                 return sortTableTitles.count
@@ -2130,13 +2350,25 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     
     public func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         
-        // FIX: IF NO FILES EXISTS IN SECTION, cvIndexPath CANNOT BE CREATED
-        if filesCV[indexPath.row].count > 0 {
-            let cvIndexPath = IndexPath(item: 0, section: indexPath.row)
-            self.filesCollectionView.scrollToItem(at: cvIndexPath, at: .top, animated: true)
-            //        selectedSubtableNumber = indexPath.row
-            //        sortItems()
-            //        self.filesCollectionView.reloadData()
+        selectedSubtableNumber = indexPath.row
+        
+        if categories[selectedCategoryNumber] == "Manuscripts" {
+            if sortSubtableStrings[sortSubtableNumbers[selectedCategoryNumber]] == "Normal view" {
+                // FIX: IF NO FILES EXISTS IN SECTION, cvIndexPath CANNOT BE CREATED (FIXED?)
+                if filesCV[indexPath.row].count > 0 {
+                    let cvIndexPath = IndexPath(item: 0, section: indexPath.row)
+                    self.filesCollectionView.scrollToItem(at: cvIndexPath, at: .top, animated: true)
+                }
+            } else {
+                populateFilesCV()
+                filesCollectionView.reloadData()
+            }
+        } else {
+            // FIX: IF NO FILES EXISTS IN SECTION, cvIndexPath CANNOT BE CREATED (FIXED?)
+            if filesCV[indexPath.row].count > 0 {
+                let cvIndexPath = IndexPath(item: 0, section: indexPath.row)
+                self.filesCollectionView.scrollToItem(at: cvIndexPath, at: .top, animated: true)
+            }
         }
         
     }
@@ -2162,15 +2394,62 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                             assignPublicationToAuthor(filename: (dragedPublication.filename), authorName: authorName)
                         }
                     }
+                case "Journal":
+                    let journalName = sortTableTitles[row]
+                    if let filename = coordinator.items[0].dragItem.localObject {
+                        if let dragedPublication = filesCV[selectedSubtableNumber].first(where: {$0.filename == filename as! String}) {
+
+                            // CORE DATA
+                            if let cdFile = publicationsCD.first(where: {$0.filename == filename as! String}) {
+                                if let journal = journalsCD.first(where: {$0.name == journalName}) {
+                                    print(dragedPublication)
+                                    print(journalName)
+                                    cdFile.journal = journal
+                                    print("Added to journal: " + journal.name!)
+                                } else {
+                                    let newJournal = Journal(context: context)
+                                    newJournal.name = journalName
+                                    newJournal.sortNumber = "1"
+                                    print("Added new journal: " + newJournal.name!)
+                                    cdFile.journal = newJournal
+                                }
+                                saveCoreData()
+                                loadCoreData()
+                            }
+//                            assignPublicationToJournal(filename: (dragedPublication.filename), journalName: journalName)
+                            
+                            
+//                            if journalsCD.first(where: {$0.name == file.journal}) == nil {
+//                                let newJournal = Journal(context: context)
+//                                newJournal.name = journalString.text
+//                                newJournal.sortNumber = "1"
+//                                print("Added new journal: " + newJournal.name!)
+//                                currentPublication.journal = newJournal
+//                            } else {
+//                                currentPublication.journal = journalsCD.first(where: {$0.name == file.journal})
+//                                print("Added to journal: " + (currentPublication.journal?.name)!)
+//                            }
+                            
+                        }
+                    }
+                case "Year":
+                    let year = sortTableTitles[row]
+                    if let filename = coordinator.items[0].dragItem.localObject {
+                        if let dragedPublication = filesCV[selectedSubtableNumber].first(where: {$0.filename == filename as! String}) {
+                            
+//                            assignPublicationToJournal(filename: (dragedPublication.filename), journalName: journalName)
+                        }
+                    }
                 default:
-                    print("")
+                    print("Default 141")
                 }
             }
         case "Manuscripts":
             print("Manuscripts")
         default:
-            print("")
+            print("Default 142")
         }
+        
         
         populateFilesCV()
         sortItems()
@@ -2185,7 +2464,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             case "Publications":
                 switch sortSubtableStrings[sortSubtableNumbers[selectedSubtableNumber]] {
                 case "Tag":
-                    if indexPath.row > 2 {
+                    if indexPath.row > 1 {
                         return true
                     } else {
                         return false
@@ -2196,6 +2475,16 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                     } else {
                         return false
                     }
+                case "Journal":
+                    if indexPath.row > 1 {
+                        return true
+                    } else {
+                        return false
+                    }
+                case "Year":
+                    return false
+                case "Rank":
+                    return false
                 default:
                     return false
                 }
@@ -2259,10 +2548,11 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     
     
     
+    
     // MARK: - Collection View
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         if collectionView == self.categoriesCV {
-            return 7
+            return 8
         } else {
             switch categories[selectedCategoryNumber] {
             case "Publications":
@@ -2307,11 +2597,30 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                 cell.icon.image = #imageLiteral(resourceName: "SupervisionIcon")
                 cell.icon.highlightedImage = #imageLiteral(resourceName: "SupervisionIconSelected")
                 cell.number.text = "54"
+            case "Miscellaneous":
+                cell.icon.image = #imageLiteral(resourceName: "MiscellaneousIcon")
+                cell.icon.highlightedImage = #imageLiteral(resourceName: "MiscellaneousIconSelected")
+                cell.number.text = "2"
             default:
                 cell.icon.image = #imageLiteral(resourceName: "PublicationsIcon")
                 cell.icon.highlightedImage = #imageLiteral(resourceName: "PublicationsIconSelected")
                 cell.number.text = "0"
             }
+            
+            switch currentTheme {
+            case 0:
+                cell.number.backgroundColor = UIColor(red: 146/255, green: 144/255, blue: 0, alpha: 1)
+                cell.number.textColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+            case 1:
+                cell.number.backgroundColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+                cell.number.textColor = UIColor(red: 0, green: 0, blue: 0, alpha: 1)
+            case 2:
+                cell.number.backgroundColor = UIColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 1)
+                cell.number.textColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+            default:
+                cell.number.backgroundColor = UIColor(red: 146/255, green: 144/255, blue: 0, alpha: 1)
+            }
+
             return cell
         } else {
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "filesCell", for: indexPath) as! FilesCell
@@ -2319,34 +2628,48 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             case "Publications":
                 cell.hiddenFilename.text = filesCV[indexPath.section][indexPath.row].filename
                 cell.thumbnail.image = filesCV[indexPath.section][indexPath.row].thumbnail
+                cell.label.text = filesCV[indexPath.section][indexPath.row].filename
 
                 if filesCV[indexPath.section][indexPath.row].favorite == "Yes" {
                     cell.favoriteIcon.isHidden = false
-                    cell.favoriteIcon.setImage(#imageLiteral(resourceName: "FavoriteOn"), for: .normal)
                 } else {
                     cell.favoriteIcon.isHidden = true
                 }
 
                 if filesCV[indexPath.section][indexPath.row].available {
-                    cell.icloudSync.isHidden = true
+                    cell.fileOffline.isHidden = true
                 } else {
-                    cell.icloudSync.isHidden = false
+                    cell.fileOffline.isHidden = false
                 }
-
-                switch sortCollectionViewStrings[sortCollectionViewNumbers[selectedCategoryNumber]] {
                 
-                case "Filename", "Year", "Author", "Date modified", "Rank":
-                    cell.label.text = filesCV[indexPath.section][indexPath.row].filename
-                    
-                case "Title":
-                    cell.label.text = filesCV[indexPath.section][indexPath.row].title
-
-                default:
-                    cell.label.text = "Error"
-                    cell.thumbnail.image = #imageLiteral(resourceName: "PublicationIcon@1x.png")
-                    cell.favoriteIcon.setImage(#imageLiteral(resourceName: "FavoriteOff"), for: .normal)
-                    
+                if editingFilesCV {
+                    cell.deleteIcon.isHidden = false
+                } else {
+                    cell.deleteIcon.isHidden = true
                 }
+                
+                if cell.hiddenFilename.text == currentSelectedFilename {
+                    cell.selectedFileFrame.isHidden = false
+                } else {
+                    cell.selectedFileFrame.isHidden = true
+                }
+
+                // FIX: Add so that selected cell has frame
+                
+//                switch sortCollectionViewStrings[sortCollectionViewNumbers[selectedCategoryNumber]] {
+//
+//                case "Filename", "Year", "Author", "Date modified", "Rank":
+//                    cell.label.text = filesCV[indexPath.section][indexPath.row].filename
+//
+//                case "Title":
+//                    cell.label.text = filesCV[indexPath.section][indexPath.row].title
+//
+//                default:
+//                    cell.label.text = "Error"
+//                    cell.thumbnail.image = #imageLiteral(resourceName: "PublicationIcon@1x.png")
+//                    cell.favoriteIcon.setImage(#imageLiteral(resourceName: "FavoriteOff"), for: .normal)
+//
+//                }
                 
             case "Manuscripts":
                 cell.label.text = filesCV[indexPath.section][indexPath.row].filename
@@ -2354,9 +2677,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                 cell.thumbnail.image = filesCV[indexPath.section][indexPath.row].thumbnail
 
                 if filesCV[indexPath.section][indexPath.row].available {
-                    cell.icloudSync.isHidden = true
+                    cell.fileOffline.isHidden = true
                 } else {
-                    cell.icloudSync.isHidden = false
+                    cell.fileOffline.isHidden = false
                 }
 
             default:
@@ -2373,25 +2696,47 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             selectedCategoryTitle.text = categories[indexPath.row]
             selectedCategoryNumber = indexPath.row
             selectedSubtableNumber = 0
+            
             kvStorage.set(selectedCategoryNumber, forKey: "selectedCategory")
             kvStorage.synchronize()
             
-            switch categories[selectedCategoryNumber] {
-            case "Publications":
-                self.focusedViewButton.isHidden = true
-                self.focusedViewText.isHidden = true
-                self.filesView.isHidden = true
-                self.notesView.isHidden = false
-            case "Manuscripts":
-                self.focusedViewButton.isHidden = false
-                self.focusedViewText.isHidden = false
-                self.filesView.isHidden = false
-                self.notesView.isHidden = true
+//            switch categories[selectedCategoryNumber] {
+//            case "Publications":
+//                self.filesView.isHidden = true
+//                self.notesView.isHidden = false
+//            case "Manuscripts":
+//                self.filesView.isHidden = false
+//                self.notesView.isHidden = true
+//            default:
+//                self.filesView.isHidden = true
+//                self.notesView.isHidden = false
+//            }
+            
+            let selectedOption = segmentedControllTablesOrNotes.titleForSegment(at: segmentedControllTablesOrNotes.selectedSegmentIndex)
+            switch selectedOption! {
+            case "List":
+                notesView.isHidden = true
+                filesView.isHidden = true
+                
+            case "Notes":
+                switch categories[selectedCategoryNumber] {
+                case "Publications":
+                    notesView.isHidden = false
+                    filesView.isHidden = true
+                case "Manuscripts", "Proposals", "Presentations":
+                    notesView.isHidden = true
+                    filesView.isHidden = false
+                default:
+                    notesView.isHidden = false
+                    filesView.isHidden = true
+                }
+                
             default:
-                self.filesView.isHidden = true
-                self.notesView.isHidden = false
+                print("Default 141")
             }
             
+            setSortTableListStrings()
+            setFilesCVSortingStrings()
             populateListTable()
             populateFilesCV()
             sortItems()
@@ -2401,34 +2746,72 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         } else {
             let currentCell = collectionView.cellForItem(at: indexPath) as! FilesCell
             
-            if let pub = publicationsCD.first(where: {$0.filename == currentCell.hiddenFilename.text}) {
-                currentPublication = pub
-                titleString.text = currentPublication.title
-                rankOutlet.value = currentPublication.rank
-                rankValue.text = "\(Int(rankOutlet.value))"
-                yearString.text = "\(currentPublication.year)"
-                authorString.text = currentPublication.author?.name
-                notesTextView.text = currentPublication.note
-                filenameString.text = currentPublication.filename
-                largeThumbnail.image = currentCell.thumbnail.image
-                if currentPublication.favorite == "Yes" {
-                    favoriteButton.setImage(#imageLiteral(resourceName: "FavoriteOn"), for: .normal)
-                } else {
-                    favoriteButton.setImage(#imageLiteral(resourceName: "FavoriteOff"), for: .normal)
+            if editingFilesCV {
+                
+                if sortTableTitles[indexPath.section] != "All publications" {
+                    for i in 0..<localFiles[0].count {
+                        if localFiles[0][i].filename == currentCell.hiddenFilename.text {
+                            let newGroups = localFiles[0][i].groups.filter { $0 !=  sortTableTitles[indexPath.section]}
+                            localFiles[0][i].groups = newGroups
+                            updateIcloud(file: localFiles[0][i])
+                        }
+                    }
+                    if let currentPublication = publicationsCD.first(where: {$0.filename == currentCell.hiddenFilename.text}) {
+                        if let group = publicationGroupsCD.first(where: {$0.tag == sortTableTitles[indexPath.section]}) {
+                            currentPublication.removeFromPublicationGroup(group)
+                            saveCoreData()
+                            loadCoreData()
+                        }
+                    }
+                    
                 }
+                
+                populateFilesCV()
+                sortItems()
+                listTableView.reloadData()
+                filesCollectionView.reloadData()
+                
+
             } else {
-                // FIX: CHANGE TO READ FROM LOCALFILES
-                filenameString.text = currentCell.hiddenFilename.text
-                titleString.text = "No title"
-                yearString.text = "-2000"
-                authorString.text = "No author"
-                notesTextView.text = "No notes"
-                rankOutlet.value = 50
-                rankValue.text = "50"
-                documentPage = 0
-                largeThumbnail.image = getThumbnail(url: publicationsURL.appendingPathComponent(currentCell.hiddenFilename.text!), pageNumber: 0)
-                favoriteButton.setImage(#imageLiteral(resourceName: "FavoriteOff"), for: .normal)
+                
+                if currentCell.fileOffline.isHidden == false {
+                    print(currentCell.hiddenFilename.text)
+                    let fileManager = FileManager.default
+                    let fileURL = publicationsURL.appendingPathComponent("." + currentCell.hiddenFilename.text! + ".icloud")
+                    do {
+                        try fileManager.startDownloadingUbiquitousItem(at: fileURL)
+                    } catch let error {
+                        print(error)
+                    }
+                }
+                
+                for i in 0..<localFiles[0].count {
+                    if localFiles[0][i].filename == currentCell.hiddenFilename.text {
+                        currentSelectedFilename = currentCell.hiddenFilename.text
+                        currentCell.selectedFileFrame.isHidden = false
+                        journalString.text = localFiles[0][i].journal
+                        rankOutlet.value = localFiles[0][i].rank!
+                        rankValue.text = "\(Int(localFiles[0][i].rank!))"
+                        yearString.text = "\(localFiles[0][i].year!)"
+                        authorString.text = localFiles[0][i].author
+                        notesString.text = localFiles[0][i].note
+                        filenameString.text = localFiles[0][i].filename
+                        largeThumbnail.image = localFiles[0][i].thumbnail
+                        if localFiles[0][i].favorite == "Yes" {
+                            favoriteButton.setImage(#imageLiteral(resourceName: "FavoriteOn"), for: .normal)
+                        } else {
+                            favoriteButton.setImage(#imageLiteral(resourceName: "FavoriteOff"), for: .normal)
+                        }
+                        if let cdFile = publicationsCD.first(where: {$0.filename == currentSelectedFilename}) {
+                            print(currentSelectedFilename)
+                            print(cdFile.journal?.name)
+                        }
+                    }
+                }
+//                filesCollectionView.reloadData()
+                
             }
+
 
             
             documentPage = 0
@@ -2486,7 +2869,25 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     }
     
     func numberOfSections(in collectionView: UICollectionView) -> Int {
-        return sortTableTitles.count
+        if collectionView == self.categoriesCV {
+            return 1
+        } else {
+            switch categories[selectedCategoryNumber] {
+            case "Publications":
+                return sortTableTitles.count
+            case "Manuscripts":
+                switch sortSubtableStrings[sortSubtableNumbers[selectedCategoryNumber]] {
+                case "Normal view":
+                    return sortTableTitles.count
+                case "Focused view":
+                    return manuscriptSections.count
+                default:
+                    return sortTableTitles.count
+                }
+            default:
+                return sortTableTitles.count
+            }
+        }
     }
 
     func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
@@ -2497,14 +2898,39 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             sectionHeaderView.mainHeaderTitle.text = sortTableTitles[indexPath[0]]
             sectionHeaderView.subHeaderTitle.text = "\(filesCV[indexPath[0]].count)" + " items"
         case "Manuscripts":
-            sectionHeaderView.mainHeaderTitle.text = sortTableTitles[indexPath[0]]
-            sectionHeaderView.subHeaderTitle.text = "\(filesCV[indexPath[0]].count)" + " items"
+            if sortSubtableStrings[sortSubtableNumbers[selectedCategoryNumber]] == "Normal view" {
+                sectionHeaderView.mainHeaderTitle.text = sortTableTitles[indexPath[0]]
+                sectionHeaderView.subHeaderTitle.text = "\(filesCV[indexPath[0]].count)" + " items"
+            } else {
+                sectionHeaderView.mainHeaderTitle.text = manuscriptSections[indexPath[0]]
+                sectionHeaderView.subHeaderTitle.text = "\(filesCV[indexPath[0]].count)" + " items"
+            }
         default:
             print("Default 136")
         }
         
+        switch currentTheme {
+        case 0:
+            sectionHeaderView.backgroundColor = UIColor(red: 146/255, green: 144/255, blue: 0, alpha: 1)
+            sectionHeaderView.tintColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+        case 1:
+            sectionHeaderView.backgroundColor = UIColor(red: 146/255, green: 144/255, blue: 0, alpha: 1)
+            sectionHeaderView.tintColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+        case 2:
+            sectionHeaderView.backgroundColor = UIColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 1)
+            sectionHeaderView.tintColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+        default:
+            sectionHeaderView.backgroundColor = UIColor(red: 146/255, green: 144/255, blue: 0, alpha: 1)
+            sectionHeaderView.tintColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+        }
+
+        
+        
         return sectionHeaderView
     }
+    
+    
+    
     
     override func viewWillAppear(_ animated: Bool) {
         self.navigationController?.isNavigationBarHidden = true
@@ -2517,6 +2943,12 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
 
 
 }
+
+
+
+
+
+
 
 
 extension UISegmentedControl {
@@ -2685,4 +3117,60 @@ extension URL {
 //    alertController.addAction(cancelAction)
 //
 //    self.present(alertController, animated: true, completion: nil)
+//}
+
+
+////THE PUBLICATION IS ADDED, NOT UPDATED
+//func updateCoreDataWithLocalFiles(index: Int, category: Int) {
+//    switch category {
+//    case 0:
+//        let newPublication = Publication(context: context)
+//
+//        newPublication.filename = localFiles[category][index].filename
+//        newPublication.thumbnail = localFiles[category][index].thumbnail
+//        newPublication.dateCreated = localFiles[category][index].dateCreated!
+//        newPublication.dateModified = localFiles[category][index].dateModified!
+//        newPublication.title = localFiles[category][index].title!
+//        newPublication.year = localFiles[category][index].year!
+//        newPublication.note = localFiles[category][index].note!
+//
+//        let noAuthor = authorsCD.first(where: {$0.name == "No author"})
+//        if localFiles[category][index].author == "No author" {
+//            newPublication.author = noAuthor
+//        } else {
+//            if authorsCD.first(where: {$0.name == localFiles[category][index].author}) == nil {
+//                let newAuthor = Author(context: context)
+//                newAuthor.name = localFiles[category][index].author!
+//                newAuthor.sortNumber = "1"
+//                print("Added new author: " + newAuthor.name!)
+//                newPublication.author = newAuthor
+//            } else {
+//                newPublication.author = authorsCD.first(where: {$0.name == localFiles[category][index].author})
+//            }
+//        }
+//
+//        newPublication.favorite = localFiles[category][index].favorite
+//
+//        for group in localFiles[category][index].groups {
+//            if publicationGroupsCD.first(where: {$0.tag == group}) == nil {
+//                let newGroup = PublicationGroup(context: context)
+//                newGroup.tag = group
+//                newGroup.sortNumber = "3"
+//                newGroup.dateModified = Date()
+//                print("Added new group: " + newGroup.tag!)
+//                newPublication.addToPublicationGroup(newGroup)
+//            } else {
+//                newPublication.addToPublicationGroup(publicationGroupsCD.first(where: {$0.tag == group})!)
+//            }
+//        }
+//
+//        publicationsCD.append(newPublication)
+//
+//        saveCoreData()
+//        loadCoreData()
+//
+//        print("Saved " + newPublication.filename! + " to core data.")
+//    default:
+//        print("Default 132")
+//    }
 //}

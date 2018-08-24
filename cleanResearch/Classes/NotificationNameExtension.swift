@@ -15,6 +15,9 @@ extension Notification.Name {
     static let sortSubtable = Notification.Name(rawValue: "sortSubtable")
     static let sortCollectionView = Notification.Name(rawValue: "sortCollectionView")
     static let settingsCollectionView = Notification.Name(rawValue: "settingsCollectionView")
+    static let settingsHighlighter = Notification.Name(rawValue: "settingsHighlighter")
+    static let textViewDidChange = Notification.Name(rawValue: "textViewDidChange")
+    static let closingPDF = Notification.Name(rawValue: "closingPDF")
 //    static let allArticles = Notification.Name(rawValue: "All articles")
     //    static let updateArticle = Notification.Name(rawValue: "updateArticle")
 }

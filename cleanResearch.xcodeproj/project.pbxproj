@@ -27,6 +27,8 @@
 		64798D33207638D500E378B2 /* PresentationsIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = 64798D31207638D400E378B2 /* PresentationsIcon.png */; };
 		64798D34207638D500E378B2 /* PublicationsIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = 64798D32207638D500E378B2 /* PublicationsIcon.png */; };
 		64798D362078154300E378B2 /* CoreDataHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64798D352078154300E378B2 /* CoreDataHelper.swift */; };
+		649252432122199000F5C6C7 /* PenSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 649252422122199000F5C6C7 /* PenSettingsViewController.swift */; };
+		6492531E212CBEB200F5C6C7 /* FrontPicture@1x.png in Resources */ = {isa = PBXBuildFile; fileRef = 6492531D212CBEB100F5C6C7 /* FrontPicture@1x.png */; };
 		6494817120EB656400768440 /* SettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6494817020EB656400768440 /* SettingsViewController.swift */; };
 		6494817320ED6A0600768440 /* FrontPictureLSHR.png in Resources */ = {isa = PBXBuildFile; fileRef = 6494817220ED6A0600768440 /* FrontPictureLSHR.png */; };
 		649B169920F2203700383300 /* fileIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = 649B169820F2203700383300 /* fileIcon.png */; };
@@ -54,6 +56,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		64260C9721028B3D00E4D546 /* cleanResearch 6.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "cleanResearch 6.xcdatamodel"; sourceTree = "<group>"; };
 		6435F0CF20D29B2000141E9A /* cleanResearch 2.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "cleanResearch 2.xcdatamodel"; sourceTree = "<group>"; };
 		64798CAA2075554600E378B2 /* cleanResearch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = cleanResearch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		64798CAD2075554600E378B2 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -83,6 +86,8 @@
 		64798D32207638D500E378B2 /* PublicationsIcon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = PublicationsIcon.png; sourceTree = "<group>"; };
 		64798D352078154300E378B2 /* CoreDataHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreDataHelper.swift; sourceTree = "<group>"; };
 		6483F27520DAD0D9005E3D08 /* cleanResearch 4.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "cleanResearch 4.xcdatamodel"; sourceTree = "<group>"; };
+		649252422122199000F5C6C7 /* PenSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PenSettingsViewController.swift; sourceTree = "<group>"; };
+		6492531D212CBEB100F5C6C7 /* FrontPicture@1x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "FrontPicture@1x.png"; sourceTree = "<group>"; };
 		6494817020EB656400768440 /* SettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewController.swift; sourceTree = "<group>"; };
 		6494817220ED6A0600768440 /* FrontPictureLSHR.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = FrontPictureLSHR.png; sourceTree = "<group>"; };
 		649B169820F2203700383300 /* fileIcon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = fileIcon.png; sourceTree = "<group>"; };
@@ -180,6 +185,7 @@
 			isa = PBXGroup;
 			children = (
 				649B169820F2203700383300 /* fileIcon.png */,
+				6492531D212CBEB100F5C6C7 /* FrontPicture@1x.png */,
 				6494817220ED6A0600768440 /* FrontPictureLSHR.png */,
 				64798D31207638D400E378B2 /* PresentationsIcon.png */,
 				64798D32207638D500E378B2 /* PublicationsIcon.png */,
@@ -205,6 +211,7 @@
 		64798D372078154900E378B2 /* Classes */ = {
 			isa = PBXGroup;
 			children = (
+				649252422122199000F5C6C7 /* PenSettingsViewController.swift */,
 				6494817020EB656400768440 /* SettingsViewController.swift */,
 				64F02B41207B3EDB00CEB186 /* NotificationNameExtension.swift */,
 				64CD3E08207B3BEB00FF3073 /* SortItemsViewController.swift */,
@@ -331,6 +338,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6492531E212CBEB200F5C6C7 /* FrontPicture@1x.png in Resources */,
 				64798CBB2075554900E378B2 /* LaunchScreen.storyboard in Resources */,
 				6494817320ED6A0600768440 /* FrontPictureLSHR.png in Resources */,
 				64798D34207638D500E378B2 /* PublicationsIcon.png in Resources */,
@@ -379,6 +387,7 @@
 				64798CB02075554600E378B2 /* ViewController.swift in Sources */,
 				64798CAE2075554600E378B2 /* AppDelegate.swift in Sources */,
 				64798CB62075554600E378B2 /* cleanResearch.xcdatamodeld in Sources */,
+				649252432122199000F5C6C7 /* PenSettingsViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -712,13 +721,14 @@
 		64798CB42075554600E378B2 /* cleanResearch.xcdatamodeld */ = {
 			isa = XCVersionGroup;
 			children = (
+				64260C9721028B3D00E4D546 /* cleanResearch 6.xcdatamodel */,
 				64DB016E20E6DC310064A2D1 /* cleanResearch 5.xcdatamodel */,
 				6483F27520DAD0D9005E3D08 /* cleanResearch 4.xcdatamodel */,
 				64CC7FF020D4029C00C15863 /* cleanResearch 3.xcdatamodel */,
 				6435F0CF20D29B2000141E9A /* cleanResearch 2.xcdatamodel */,
 				64798CB52075554600E378B2 /* cleanResearch.xcdatamodel */,
 			);
-			currentVersion = 64DB016E20E6DC310064A2D1 /* cleanResearch 5.xcdatamodel */;
+			currentVersion = 64260C9721028B3D00E4D546 /* cleanResearch 6.xcdatamodel */;
 			path = cleanResearch.xcdatamodeld;
 			sourceTree = "<group>";
 			versionGroupType = wrapper.xcdatamodel;

@@ -18,26 +18,17 @@
                         <rect key="frame" x="0.0" y="0.0" width="1024" height="768"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <imageView opaque="NO" multipleTouchEnabled="YES" contentMode="scaleToFill" fixedFrame="YES" insetsLayoutMarginsFromSafeArea="NO" image="FrontPictureLSHR.png" translatesAutoresizingMaskIntoConstraints="NO" id="iZL-Yg-3pF">
-                                <rect key="frame" x="0.0" y="-2" width="1025" height="772"/>
-                                <autoresizingMask key="autoresizingMask"/>
+                            <imageView opaque="NO" multipleTouchEnabled="YES" contentMode="scaleToFill" insetsLayoutMarginsFromSafeArea="NO" image="FrontPicture.png" translatesAutoresizingMaskIntoConstraints="NO" id="iZL-Yg-3pF">
+                                <rect key="frame" x="0.0" y="0.0" width="1024" height="768"/>
                             </imageView>
-                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" fixedFrame="YES" usesAttributedText="YES" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="NXn-9d-pfv">
-                                <rect key="frame" x="384" y="623" width="268" height="50"/>
-                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
-                                <attributedString key="attributedText">
-                                    <fragment content="Clean Reseach">
-                                        <attributes>
-                                            <color key="NSColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
-                                            <font key="NSFont" size="42" name="HelveticaNeue-Thin"/>
-                                            <paragraphStyle key="NSParagraphStyle" alignment="right" lineBreakMode="wordWrapping" baseWritingDirection="natural" tighteningFactorForTruncation="0.0"/>
-                                        </attributes>
-                                    </fragment>
-                                </attributedString>
-                                <nil key="highlightedColor"/>
-                            </label>
                         </subviews>
                         <color key="backgroundColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <constraints>
+                            <constraint firstAttribute="trailing" secondItem="iZL-Yg-3pF" secondAttribute="trailing" id="6VM-lM-GzA"/>
+                            <constraint firstAttribute="bottom" secondItem="iZL-Yg-3pF" secondAttribute="bottom" id="Y8a-SV-sIN"/>
+                            <constraint firstItem="iZL-Yg-3pF" firstAttribute="top" secondItem="Ze5-6b-2t3" secondAttribute="top" id="kSl-3E-bw2"/>
+                            <constraint firstItem="iZL-Yg-3pF" firstAttribute="leading" secondItem="6Tk-OE-BBY" secondAttribute="leading" id="tsC-1v-uUo"/>
+                        </constraints>
                         <viewLayoutGuide key="safeArea" id="6Tk-OE-BBY"/>
                     </view>
                 </viewController>
@@ -47,6 +38,6 @@
         </scene>
     </scenes>
     <resources>
-        <image name="FrontPictureLSHR.png" width="2048" height="1536"/>
+        <image name="FrontPicture.png" width="1024" height="768"/>
     </resources>
 </document>
