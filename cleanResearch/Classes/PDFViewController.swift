@@ -344,7 +344,7 @@ class PDFViewController: UIViewController, PDFViewDelegate {
                 if let touch = touches.first {
                     var position = touch.location(in: annotationView)
                     position = pdfView.convert(position, to: currentPage)
-                    let annotation = PDFAnnotation(bounds: CGRect(x: position.x, y: position.y, width: thickness-thickness/2, height: thickness-thickness/2), forType: .highlight, withProperties: nil)
+                    let annotation = PDFAnnotation(bounds: CGRect(x: position.x, y: position.y-thickness/2, width: thickness-thickness/2, height: thickness), forType: .highlight, withProperties: nil)
                     annotation.color = highlighterColor
                     annotation.endLineStyle = .circle
                     annotation.color.withAlphaComponent(0.8)
@@ -367,7 +367,7 @@ class PDFViewController: UIViewController, PDFViewDelegate {
                             start = 1
                         }
                         
-                        let rect = CGRect(x: highlightLine[start].x, y: highlightLine[0].y-5, width: width, height: 10)
+                        let rect = CGRect(x: highlightLine[start].x, y: highlightLine[0].y-thickness/2, width: width, height: thickness)
                         let annotation = PDFAnnotation(bounds: rect, forType: .highlight, withProperties: nil)
                         annotation.color = highlighterColor
                         annotation.endLineStyle = .circle

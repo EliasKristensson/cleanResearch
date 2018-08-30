@@ -80,6 +80,23 @@ struct File {
     var favorite: String
 }
 
+struct ProjectFile {
+    var name: String
+    var amountReceived: Int16
+    var amountRemaining: Int16
+    var expenses: [ExpenseFile]
+}
+
+struct ExpenseFile {
+    var amount: Int16
+    var reference: String?
+    var overhead: Int16?
+    var comment: String?
+    var pdfURL: URL?
+}
+
+
+
 class categoryCell: UICollectionViewCell {
     
     @IBOutlet weak var icon: UIImageView!
@@ -109,6 +126,21 @@ class FilesCell: UICollectionViewCell {
     
 }
 
+class EconomyCell: UITableViewCell {
+    @IBOutlet weak var expenseAmount: UILabel!
+    @IBOutlet weak var overheadAmount: UILabel!
+    @IBOutlet weak var referenceString: UILabel!
+    @IBOutlet weak var commentString: UILabel!
+    
+}
+
+struct DownloadingFile {
+    var filename: String
+    var url: URL
+    var downloaded: Bool
+}
+
+
 //UIViewController, UITableViewDataSource, UITableViewDelegate, UICollectionViewDelegate, UICollectionViewDataSource, UIPopoverPresentationControllerDelegate, UIDocumentMenuDelegate, UIDocumentPickerDelegate, QLPreviewControllerDataSource, QLPreviewControllerDelegate, UICollectionViewDragDelegate, UICollectionViewDropDelegate, UITableViewDropDelegate
 
 class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPresentationControllerDelegate, UIDocumentMenuDelegate, UICollectionViewDelegate, UICollectionViewDataSource, UITableViewDataSource, UITableViewDelegate, UICollectionViewDragDelegate, UICollectionViewDropDelegate, UITableViewDropDelegate {
@@ -130,15 +162,12 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     var journalsCD: [Journal] = []
     var publicationGroupsCD: [PublicationGroup] = []
     var manuscriptsCD: [Manuscript] = []
+    var projectCD: [Project] = []
+    var expensesCD: [Expense] = []
     
     var currentPublication: Publication!
-//    var currentAuthor: Author!
-//    var currentGroup: PublicationGroup!
     var currentIndexPath: IndexPath!
 
-    
-//    let database = CKContainer.default().privateCloudDatabase
-//    var articles = [CKRecord]()
     
     // MARK: - iCloud variables
     var documentURL: URL!
@@ -146,12 +175,14 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     var iCloudURL: URL!
     var kvStorage: NSUbiquitousKeyValueStore!
     var publicationsURL: URL!
+    var projectsURL: URL!
     var manuscriptsURL: URL!
     var proposalsURL: URL!
     var presentationsURL: URL!
     var supervisionsURL: URL!
     var miscellaneousURL: URL!
     var patentsURL: URL!
+    var economyURL: URL!
     var metaDataQuery: NSMetadataQuery?
     var metaData: NSMetadataQuery!
     var publicationsIC: [PublicationFile] = []
@@ -159,7 +190,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     
     // MARK: - UI variables
     let documentInteractionController = UIDocumentInteractionController()
-    let categories: [String] = ["Publications", "Manuscripts", "Presentations", "Proposals", "Supervision", "Teaching", "Patents", "Miscellaneous"]
+    let categories: [String] = ["Publications", "Economy", "Manuscripts", "Presentations", "Proposals", "Supervision", "Teaching", "Patents", "Miscellaneous"]
     var settingsCollectionViewBox = CGSize(width: 250, height: 300)
     var currentTheme: Int = 0
     var editingFilesCV = false
@@ -171,16 +202,15 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     var selectedCategoryNumber = 0
 
     var localFiles: [[LocalFile]] = [[]]
-    var filesCV: [[LocalFile]] = [[],[],[],[],[],[],[],[]] //Place files to be displayed in collection view here
+    var filesCV: [[LocalFile]] = [[],[],[],[],[],[],[],[],[]] //Place files to be displayed in collection view here
     var sortSubtableStrings: [String] = [""]
-    var sortSubtableNumbers: [Int] = [0, 0, 0, 0, 0, 0, 0]
+    var sortSubtableNumbers: [Int] = [0, 0, 0, 0, 0, 0, 0, 0, 0]
     var selectedSubtableNumber = 0
     var sortTableTitles: [String] = [""]
 
     var yearsString: [String] = [""]
     
     var currentFilename: String = ""
-//    var publicationFiles = [PublicationFile]()
     var dateFormatter = DateFormatter()
     
     var PDFdocument: PDFDocument!
@@ -190,8 +220,17 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     var manuscriptSections = [""]
     var proposalsSections = [""]
     
+    var downloadTimer: Timer!
+    var filesDownloading: [DownloadingFile]!
+    
+    var textColor: UIColor!
+    var backgroundColor: UIColor!
+    var barColor: UIColor!
+    
     // MARK: - Outlets
     @IBOutlet var mainView: UIView!
+    @IBOutlet weak var economyView: UIView!
+    @IBOutlet weak var economyHeader: UILabel!
     
     @IBOutlet weak var activityIndicator: UIActivityIndicatorView!
     
@@ -204,6 +243,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     @IBOutlet weak var segmentedControllTablesOrNotes: UISegmentedControl!
     @IBOutlet weak var sortCVButton: UIButton!
     @IBOutlet weak var sortSTButton: UIButton!
+    @IBOutlet weak var addNewGroupText: UIButton!
     
     
     @IBOutlet weak var largeThumbnail: UIImageView!
@@ -220,6 +260,19 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     @IBOutlet weak var fileTypePicker: UIPickerView!
     
     @IBOutlet weak var settingsButton: UIButton!
+    
+    @IBOutlet weak var amountReceivedString: UITextField!
+    
+    @IBOutlet weak var amountRemainingString: UITextField!
+    
+    @IBOutlet weak var currencyString: UILabel!
+    @IBOutlet weak var expenseString: UITextField!
+    @IBOutlet weak var overheadString: UITextField!
+    @IBOutlet weak var referenceString: UITextField!
+    @IBOutlet weak var commentString: UITextField!
+    @IBOutlet weak var expensesTableView: UITableView!
+    
+    
     
     //MARK: - IBActions
     @IBAction func downloadFromIcloud(_ sender: Any) {
@@ -409,7 +462,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             loadCoreData()
             
             populateFilesCV()
-            sortItems()
+//            sortItems()
             listTableView.reloadData()
             filesCollectionView.reloadData()
             
@@ -554,7 +607,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         compareLocalFilesWithDatabase()
         populateFilesCV()
         populateListTable()
-        sortItems()
+//        sortItems()
         listTableView.reloadData()
         filesCollectionView.reloadData()
     }
@@ -599,6 +652,31 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         present(documentPicker, animated: true, completion:nil)
     }
     
+    @IBAction func addReceiptPDF(_ sender: Any) {
+    }
+    
+    @IBAction func addExpenseTapped(_ sender: Any) {
+        let currentProject = projectCD[selectedSubtableNumber]
+        let newExpense = Expense(context: context)
+        newExpense.amount = isStringAnInt(stringNumber: expenseString.text!)
+        newExpense.overhead = isStringAnInt(stringNumber: overheadString.text!)
+        newExpense.dateAdded = Date()
+        if let comment = commentString.text {
+            newExpense.comment = comment
+        }
+        if let reference = referenceString.text {
+            newExpense.reference = reference
+        }
+        
+        newExpense.project = currentProject
+        expensesCD.append(newExpense)
+        
+        saveCoreData()
+        loadCoreData()
+        
+        self.expensesTableView.reloadData()
+    }
+    
     @IBAction func addNewGroup(_ sender: Any) {
         switch categories[selectedCategoryNumber] {
         case "Publications":
@@ -608,13 +686,37 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             })
             inputNewGroup.addAction(UIAlertAction(title: "Ok", style: .default, handler: { (action) in
                 let newGroup = inputNewGroup.textFields?[0]
-                self.addNewItem(title: newGroup?.text)
+                self.addNewItem(title: newGroup?.text, number: [""])
                 inputNewGroup.dismiss(animated: true, completion: nil)
             }))
             inputNewGroup.addAction(UIAlertAction(title: "Cancel", style: .default, handler: { (action) in
                 inputNewGroup.dismiss(animated: true, completion: nil)
             }))
             self.present(inputNewGroup, animated: true, completion: nil)
+            
+        case "Economy":
+            let inputNewProject = UIAlertController(title: "New project", message: "Enter name of new project", preferredStyle: .alert)
+            inputNewProject.addTextField(configurationHandler: { (inputNewProject: UITextField) -> Void in
+                inputNewProject.placeholder = "Enter project name"
+            })
+            inputNewProject.addTextField(configurationHandler: { (inputNewProject: UITextField) -> Void in
+                inputNewProject.placeholder = "Input received amount"
+            })
+            inputNewProject.addTextField(configurationHandler: { (inputNewProject: UITextField) -> Void in
+                inputNewProject.text = "Euro"
+            })
+            inputNewProject.addAction(UIAlertAction(title: "Ok", style: .default, handler: { (action) in
+                let newProject = inputNewProject.textFields?[0]
+                let amount = inputNewProject.textFields?[1]
+                let currency = inputNewProject.textFields?[2]
+                self.addNewItem(title: newProject?.text, number: [amount?.text, currency?.text])
+                self.categoriesCV.reloadData()
+                inputNewProject.dismiss(animated: true, completion: nil)
+            }))
+            inputNewProject.addAction(UIAlertAction(title: "Cancel", style: .default, handler: { (action) in
+                inputNewProject.dismiss(animated: true, completion: nil)
+            }))
+            self.present(inputNewProject, animated: true, completion: nil)
             
         default:
             print("110")
@@ -650,6 +752,16 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         filesCollectionView.reloadData()
     }
     
+    @IBAction func amountReceivedEdited(_ sender: Any) {
+        let currentProject = projectCD[selectedSubtableNumber]
+        currentProject.amountReceived = isStringAnInt(stringNumber: amountReceivedString.text!)
+        currentProject.amountRemaining = currentProject.amountReceived
+        
+        saveCoreData()
+        loadCoreData()
+        
+        expensesTableView.reloadData()
+    }
     
     
     
@@ -669,6 +781,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         context = appDelegate.context
         
         publicationsURL = appDelegate.publicationURL
+        projectsURL = appDelegate.projectURL
         manuscriptsURL = appDelegate.manuscriptURL
         proposalsURL = appDelegate.publicationURL
         patentsURL = appDelegate.patentsURL
@@ -697,7 +810,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         filesCollectionView.dataSource = self
         filesCollectionView.dragDelegate = self
         filesCollectionView.dropDelegate = self
-
+        
+        expensesTableView.delegate = self
+        expensesTableView.dataSource = self
         listTableView.delegate = self
         listTableView.dataSource = self
         listTableView.dropDelegate = self
@@ -711,15 +826,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         let doubleTap = UITapGestureRecognizer(target: self, action: #selector(doubleTapped))
         doubleTap.numberOfTapsRequired = 2
         self.filesCollectionView.addGestureRecognizer(doubleTap)
-
-        for journal in journalsCD {
-            print(journal.name)
-            print(journal.publication)
-        }
         
-//        getRecordNames()
-
     }
+    
     
     
     
@@ -787,7 +896,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
 
         populateListTable()
         populateFilesCV()
-        sortItems()
+//        sortItems()
 
         self.listTableView.reloadData()
         self.filesCollectionView.reloadData()
@@ -798,7 +907,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         let sortValue = sortingVC.sortOptions.selectedSegmentIndex
         sortCollectionViewNumbers[selectedCategoryNumber] = sortValue
         
-        sortItems()
+//        sortItems()
         
         kvStorage.set(sortSubtableNumbers, forKey: "sortCollectionView")
         kvStorage.synchronize()
@@ -841,6 +950,46 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         }
     }
     
+    @objc func checkIfFileIsDownloaded() {
+        var stillDownloading = false
+        for i in 0..<filesDownloading.count {
+            if !filesDownloading[i].downloaded {
+                let fileManager = FileManager.default
+                do {
+                    let file = filesDownloading[i]
+                    var filename = file.url.deletingPathExtension().lastPathComponent
+                    filename.remove(at: filename.startIndex)
+                    let folder = file.url.deletingLastPathComponent()
+                    let filePath = folder.appendingPathComponent(filename).path
+                    let exist = fileManager.fileExists(atPath: filePath)
+                    print(filename)
+                    print(filePath)
+                    print(exist)
+                    
+                    if !exist {
+                        stillDownloading = true
+                    } else {
+                        filesDownloading[i].downloaded = true
+                        readIcloudDriveFolders()
+                        compareLocalFilesWithDatabase()
+                        populateFilesCV()
+                        populateListTable()
+//                        sortItems()
+                        listTableView.reloadData()
+                        filesCollectionView.reloadData()
+                    }
+                }
+            }
+
+        }
+        
+        if !stillDownloading {
+            downloadTimer.invalidate()
+            activityIndicator.stopAnimating()
+        }
+        
+        
+    }
     
     
     
@@ -997,7 +1146,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                     self.compareLocalFilesWithDatabase()
                     self.populateListTable()
                     self.populateFilesCV()
-                    self.sortItems()
+//                    self.sortItems()
                     
                     self.categoriesCV.reloadData()
                     self.listTableView.reloadData()
@@ -1012,7 +1161,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             compareLocalFilesWithDatabase()
             populateListTable()
             populateFilesCV()
-            sortItems()
+//            sortItems()
             
             self.categoriesCV.reloadData()
             listTableView.reloadData()
@@ -1124,11 +1273,12 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             annotationSettings = [0, 0, 0, 0]
         }
         
-        if let number = kvStorage.array(forKey: "selectedCategory") as? Int {
-            selectedCategoryNumber = number
-        } else {
-            selectedCategoryNumber = 0
-        }
+//        if let number = kvStorage.object(forKey: "selectedCategory") as? Int {
+//            selectedCategoryNumber = number
+//        } else {
+//            selectedCategoryNumber = 0
+//        }
+        
         //        kvStorage.longLong(forKey: "selectedSubtable")
         //        if let number = kvStorage.array(forKey: "selectedSubtable") as? Int {
         //            selectedSubtableNumber = number
@@ -1271,7 +1421,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         }
     }
     
-    func addNewItem(title: String?) {
+    func addNewItem(title: String?, number: [String?]) {
         switch categories[selectedCategoryNumber] {
         case "Publications":
             if let newTag = title {
@@ -1287,11 +1437,39 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                 
                 populateListTable()
                 populateFilesCV()
+//                sortItems()
                 
                 self.listTableView.reloadData()
                 self.filesCollectionView.reloadData()
             }
             
+        case "Economy":
+            if let newTitle = title {
+                if let amount = number[0] {
+                    if let currency = number[1] {
+                        let amountReceived = isStringAnInt(stringNumber: amount)
+                        let newProject = Project(context: context)
+                        newProject.name = newTitle
+                        newProject.dateModified = Date()
+                        newProject.dateCreated = Date()
+                        newProject.amountReceived = amountReceived
+                        newProject.currency = currency
+                        
+                        projectCD.append(newProject)
+                        
+                        saveCoreData()
+                        loadCoreData()
+                        
+                        amountReceivedString.text = "\(amountReceived)"
+                        amountRemainingString.text = "0"
+                        currencyString.text = currency
+                        
+                        
+                        populateListTable()
+                        self.listTableView.reloadData()
+                    }
+                }
+            }
         default:
             print("Default 111")
             
@@ -1299,42 +1477,40 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     }
     
     func setThemeColor() {
+        
         switch currentTheme {
-        case 0:
-            mainView.backgroundColor = UIColor(red: 0, green: 0, blue: 1, alpha: 1)
-            categoriesCV.backgroundColor = UIColor(red: 0, green: 0, blue: 1, alpha: 1)
-            notesView.backgroundColor = UIColor(red: 0, green: 0, blue: 1, alpha: 1)
-            selectedCategoryTitle.backgroundColor = UIColor(red: 146/255, green: 144/255, blue: 0, alpha: 1)
-            selectedCategoryTitle.textColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
-            segmentedControllTablesOrNotes.tintColor = UIColor(red: 146/255, green: 144/255, blue: 0, alpha: 1)
-            segmentedControllTablesOrNotes.backgroundColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
-        case 1:
-            mainView.backgroundColor = UIColor(red: 1, green: 0, blue: 0, alpha: 1)
-            categoriesCV.backgroundColor = UIColor(red: 1, green: 0, blue: 0, alpha: 1)
-            notesView.backgroundColor = UIColor(red: 1, green: 0, blue: 0, alpha: 1)
-            notesView.tintColor = UIColor(red: 0, green: 0, blue: 0, alpha: 1)
-            selectedCategoryTitle.backgroundColor = UIColor(red: 0, green: 0, blue: 1, alpha: 1)
-            selectedCategoryTitle.textColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
-            segmentedControllTablesOrNotes.tintColor = UIColor(red: 0, green: 0, blue: 1, alpha: 1)
-            segmentedControllTablesOrNotes.backgroundColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
-        case 2:
-            mainView.backgroundColor = UIColor(red: 0, green: 0, blue: 0, alpha: 1)
-            categoriesCV.backgroundColor = UIColor(red: 0, green: 0, blue: 0, alpha: 1)
-            notesView.backgroundColor = UIColor(red: 0, green: 0, blue: 0, alpha: 1)
-            notesView.tintColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
-            selectedCategoryTitle.backgroundColor = UIColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 1)
-            selectedCategoryTitle.textColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
-            segmentedControllTablesOrNotes.tintColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
-            segmentedControllTablesOrNotes.backgroundColor = UIColor(red: 0, green: 0, blue: 0, alpha: 1)
-            
+        case 0: //Blue
+            backgroundColor = UIColor(red: 0, green: 0, blue: 1, alpha: 1)
+            textColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+            barColor = UIColor(red: 146/255, green: 144/255, blue: 0, alpha: 1)
+        case 1: //Red
+            backgroundColor = UIColor(red: 1, green: 0, blue: 0, alpha: 1)
+            textColor = UIColor(red: 0, green: 0, blue: 0, alpha: 1)
+            barColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+        case 2: //Night
+            backgroundColor = UIColor(red: 0, green: 0, blue: 0, alpha: 1)
+            textColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+            barColor = UIColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 1)
         default:
-            mainView.backgroundColor = UIColor(red: 0, green: 0, blue: 1, alpha: 1)
-            categoriesCV.backgroundColor = UIColor(red: 0, green: 0, blue: 1, alpha: 1)
-            notesView.backgroundColor = UIColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 1)
-            notesView.tintColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
-            selectedCategoryTitle.backgroundColor = UIColor(red: 146/255, green: 144/255, blue: 0, alpha: 1)
-            selectedCategoryTitle.textColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+            backgroundColor = UIColor(red: 0, green: 0, blue: 1, alpha: 1)
+            textColor = UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+            barColor = UIColor(red: 146/255, green: 144/255, blue: 0, alpha: 1)
         }
+        
+        mainView.backgroundColor = backgroundColor
+        categoriesCV.backgroundColor = backgroundColor
+        notesView.backgroundColor = textColor
+        notesView.tintColor = barColor
+        selectedCategoryTitle.backgroundColor = barColor
+        selectedCategoryTitle.textColor = textColor
+        segmentedControllTablesOrNotes.tintColor = barColor
+        segmentedControllTablesOrNotes.backgroundColor = backgroundColor
+        economyView.backgroundColor = backgroundColor
+        economyHeader.backgroundColor = barColor
+        listTableView.backgroundColor = backgroundColor
+        listTableView.tintColor = textColor
+
+        
         filesCollectionView.reloadData()
     }
     
@@ -1342,7 +1518,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         switch categories[selectedCategoryNumber] {
         case "Publications":
             sortTableTitles = [String]()
-            switch sortSubtableStrings[sortSubtableNumbers[selectedSubtableNumber]] {
+            //FIX: selectedSubtableNumber is maybe not correctly selected when jumping between settings
+            
+            switch sortSubtableStrings[sortSubtableNumbers[selectedCategoryNumber]] {
             case "Tag":
                 let tmp = publicationGroupsCD.sorted(by: {($0.sortNumber!, $0.tag!) < ($1.sortNumber!, $1.tag!)})
                 sortTableTitles = tmp.map { $0.tag! }
@@ -1354,7 +1532,6 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             case "Journal":
                 let tmp = journalsCD.sorted(by: {($0.sortNumber!, $0.name!) < ($1.sortNumber!, $1.name!)})
                 sortTableTitles = tmp.map { $0.name! }
-                print(sortTableTitles)
             case "Rank":
                 sortTableTitles = ["0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80-89", "90-99", "100"]
             default:
@@ -1370,6 +1547,11 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             } catch {
                 print("Error while reading manuscript folders")
             }
+        case "Economy":
+            sortTableTitles = [String]()
+            let tmp = projectCD.sorted(by: {$0.name! < $1.name!})
+            sortTableTitles = tmp.map { $0.name! }
+            
         default:
             print("Default 126")
         }
@@ -1382,7 +1564,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         
         switch categories[selectedCategoryNumber] {
         case "Publications": //LocalFiles[0]
-            switch sortSubtableStrings[sortSubtableNumbers[selectedSubtableNumber]] {
+            switch sortSubtableStrings[sortSubtableNumbers[selectedCategoryNumber]] {
             case "Tag":
                 for i in 0..<sortTableTitles.count {
                     for file in localFiles[0] {
@@ -1390,6 +1572,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                             filesCV[i].append(file)
                         }
                     }
+                    filesCV[i] = filesCV[i].sorted(by: {($0.filename) < ($1.filename)})
                     if i < sortTableTitles.count {
                         filesCV.append([]) // ADD [] FOR THE NEXT ROUND
                     }
@@ -1401,6 +1584,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                             filesCV[i].append(file)
                         }
                     }
+                    filesCV[i] = filesCV[i].sorted(by: {($0.filename) < ($1.filename)})
                     if i < sortTableTitles.count {
                         filesCV.append([]) // ADD [] FOR THE NEXT ROUND
                     }
@@ -1409,12 +1593,10 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                 for i in 0..<sortTableTitles.count {
                     for file in localFiles[0] {
                         if file.journal == sortTableTitles[i] {
-//                            print(i)
-//                            print(file.filename)
-//                            print(file.journal)
                             filesCV[i].append(file)
                         }
                     }
+                    filesCV[i] = filesCV[i].sorted(by: {($0.filename) < ($1.filename)})
                     if i < sortTableTitles.count {
                         filesCV.append([]) // ADD [] FOR THE NEXT ROUND
                     }
@@ -1426,6 +1608,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                             filesCV[i].append(file)
                         }
                     }
+                    filesCV[i] = filesCV[i].sorted(by: {($0.filename) < ($1.filename)})
                     if i < sortTableTitles.count {
                         filesCV.append([]) // ADD [] FOR THE NEXT ROUND
                     }
@@ -1444,6 +1627,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                             }
                         }
                     }
+                    filesCV[i] = filesCV[i].sorted(by: {($0.filename) < ($1.filename)})
                     if i < sortTableTitles.count {
                         filesCV.append([]) // ADD [] FOR THE NEXT ROUND
                     }
@@ -1452,17 +1636,18 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                 print("Default 132")
             }
             
-        case "Manuscripts": //localFiles[1]
+        case "Manuscripts": //localFiles[2]
             filesCV = [[]]
 
             switch sortSubtableStrings[sortSubtableNumbers[selectedCategoryNumber]] {
             case "Normal view":
                 for i in 0..<sortTableTitles.count {
-                    for file in localFiles[1] {
+                    for file in localFiles[2] {
                         if file.parentFolder == sortTableTitles[i] {
                             filesCV[i].append(file)
                         }
                     }
+                    filesCV[i] = filesCV[i].sorted(by: {($0.filename) < ($1.filename)})
                     if i < sortTableTitles.count {
                         filesCV.append([]) // ADD [] FOR THE NEXT ROUND
                     }
@@ -1476,7 +1661,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                 }
 
                 //FIX: NOT FINISHED HERE
-                for file in localFiles[1] {
+                for file in localFiles[2] {
                     if file.parentFolder == sortTableTitles[selectedSubtableNumber] {
                         let components = file.filename.components(separatedBy: ".")
                         
@@ -1526,7 +1711,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                 }
                 
                 //FIX: NOT FINISHED HERE
-                for file in localFiles[1] {
+                for file in localFiles[3] {
                     if file.parentFolder == sortTableTitles[selectedSubtableNumber] {
                         let components = file.filename.components(separatedBy: ".")
                         
@@ -1615,6 +1800,22 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         } catch {
             print("Error loading publications")
         }
+        
+        let requestProjects: NSFetchRequest<Project> = Project.fetchRequest()
+        requestProjects.sortDescriptors = [NSSortDescriptor(key: "name", ascending: true)]
+        do {
+            projectCD = try context.fetch(requestProjects)
+        } catch {
+            print("Error loading project")
+        }
+
+        let requestExpenses: NSFetchRequest<Expense> = Expense.fetchRequest()
+        requestExpenses.sortDescriptors = [NSSortDescriptor(key: "dateAdded", ascending: true)]
+        do {
+            expensesCD = try context.fetch(requestExpenses)
+        } catch {
+            print("Error loading expenses")
+        }
     }
     
     func setupDefaultCoreDataTypes() {
@@ -1667,6 +1868,8 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     // MARK: - GENERAL FUNCTIONS
     func setupUI() {
 
+        filesDownloading = []
+        
         privateDatabase = container().privateCloudDatabase
         recordZone = CKRecordZone(zoneName: "CleanResearchZone")
 
@@ -1684,6 +1887,26 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         
         kvStorage = NSUbiquitousKeyValueStore()
         loadDefaultValues()
+        
+        
+        switch categories[selectedCategoryNumber] {
+        case "Economy":
+            economyView.isHidden = false
+            filesCollectionView.isHidden = true
+            segmentedControllTablesOrNotes.isHidden = true
+            economyHeader.isHidden = false
+            addNewGroupText.setTitle("New project", for: .normal)
+            filesView.isHidden = true
+            sortSTButton.isHidden = true
+        default:
+            economyView.isHidden = true
+            segmentedControllTablesOrNotes.isHidden = false
+            economyHeader.isHidden = true
+            addNewGroupText.setTitle("New group", for: .normal)
+            filesCollectionView.isHidden = false
+            filesView.isHidden = false
+            sortSTButton.isHidden = false
+        }
         
 //        journalString.addTarget(self, action: #selector(textFieldDidChange(_:)), for: .editingChanged)
         
@@ -1707,6 +1930,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             
             // UPDATING LOCALFILES
             let currentFile = updateLocalFiles()
+            print(currentFile?.year)
             
             // UPDATING CORE DATA
             updateCoreData(file: currentFile!)
@@ -1716,7 +1940,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
 
             populateListTable()
             populateFilesCV()
-            sortItems()
+//            sortItems()
             listTableView.reloadData()
             filesCollectionView.reloadData()
 //        case "Manuscripts":
@@ -1837,6 +2061,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     }
     
     func updateLocalFilesWithCoreData(index: Int, category: Int, coreDataFile: Any) {
+        //FIX: If "publications" isn't loaded first, the files are not correctly read.
         switch category {
         case 0:
             let currentCoreDataFile = coreDataFile as! Publication
@@ -1858,10 +2083,6 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             } else {
                 localFiles[category][index].author = "No author"
             }
-
-            if localFiles[category][index].filename == "Adrian2005.pdf" {
-                print(localFiles[category][index].journal)
-            }
             
             if let journal = currentCoreDataFile.journal?.name {
                 print(journal)
@@ -1869,11 +2090,6 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             } else {
                 print("No journal found")
                 localFiles[category][index].journal = "No journal"
-            }
-
-            if localFiles[category][index].filename == "Adrian2005.pdf" {
-                print(localFiles[category][index].journal)
-                print(currentCoreDataFile.journal?.name)
             }
 
             localFiles[category][index].favorite = "No"
@@ -2009,8 +2225,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         }
     }
     
-    func isStringAnInt(stringNumber: String) -> Int16 {
-        if let tmpValue = Int16(stringNumber) {
+    func isStringAnInt(stringNumber: String?) -> Int16 {
+        let number = stringNumber!.replacingOccurrences(of: "\"", with: "")
+        if let tmpValue = Int16(number) {
             return tmpValue
         }
         print("String number could not be converted")
@@ -2064,8 +2281,8 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         if (segue.identifier == "segueSortSubtable") {
             setSortTableListStrings()
             let destination = segue.destination as! SortSubtableViewController
-            if sortSubtableNumbers[selectedSubtableNumber] > sortSubtableStrings.count {
-                sortSubtableNumbers[selectedSubtableNumber] = 0
+            if sortSubtableNumbers[selectedCategoryNumber] > sortSubtableStrings.count {
+                sortSubtableNumbers[selectedCategoryNumber] = 0
             }
             destination.sortValue = sortSubtableNumbers[selectedCategoryNumber]
             destination.sortStrings = sortSubtableStrings
@@ -2188,43 +2405,58 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     
     func sortItems() {
         
+        // New approach, always arrange alphabetically
         switch categories[selectedCategoryNumber] {
         case "Publications":
-            switch sortCollectionViewStrings[sortCollectionViewNumbers[selectedCategoryNumber]] {
-            case "Filename":
-                if !filesCV[selectedSubtableNumber].isEmpty {
-                    filesCV[selectedSubtableNumber] = filesCV[selectedSubtableNumber].sorted(by: {($0.filename) < ($1.filename)})
-                }
-            case "Title":
-                if !filesCV[selectedSubtableNumber].isEmpty {
-                    filesCV[selectedSubtableNumber] = filesCV[selectedSubtableNumber].sorted(by: {$0.title! < $1.title!})
-                }
-            case "Year":
-                if !filesCV[selectedSubtableNumber].isEmpty {
-                    filesCV[selectedSubtableNumber] = filesCV[selectedSubtableNumber].sorted(by: {$0.year! < $1.year!})
-                }
-            case "Author":
-                if !filesCV[selectedSubtableNumber].isEmpty {
-                    filesCV[selectedSubtableNumber] = filesCV[selectedSubtableNumber].sorted(by: {($0.author)! < ($1.author)!})
-                }
-            case "Date modified":
-                if !filesCV[selectedSubtableNumber].isEmpty {
-                    filesCV[selectedSubtableNumber] = filesCV[selectedSubtableNumber].sorted(by: {$0.dateModified! < $1.dateModified!})
-                }
-            case "Rank":
-                if !filesCV[selectedSubtableNumber].isEmpty {
-                    filesCV[selectedSubtableNumber] = filesCV[selectedSubtableNumber].sorted(by: {$0.rank! < $1.rank!})
-                }
-            default:
-                print("Default sortItems 101")
-            }
-        case "Manuscripts":
+            filesCV[selectedSubtableNumber] = filesCV[selectedSubtableNumber].sorted(by: {($0.filename) < ($1.filename)})
+        case "Manuscript":
             for i in 0..<filesCV.count {
                 filesCV[i] = filesCV[i].sorted(by: {($0.filename) < ($1.filename)})
             }
         default:
-            print("Default sortItems 102")
+            filesCV[selectedSubtableNumber] = filesCV[selectedSubtableNumber].sorted(by: {($0.filename) < ($1.filename)})
         }
+//            //FIX: selectedSubtableNumber is maybe not correctly selected when jumping between settings
+//            print("Sorting collectionView")
+//            print(sortCollectionViewNumbers)
+//            print(selectedCategoryNumber)
+//            print(sortCollectionViewStrings[sortCollectionViewNumbers[selectedCategoryNumber]])
+//
+//            switch sortCollectionViewStrings[sortCollectionViewNumbers[selectedCategoryNumber]] {
+//            case "Filename":
+//                if !filesCV[selectedSubtableNumber].isEmpty {
+//                    filesCV[selectedSubtableNumber] = filesCV[selectedSubtableNumber].sorted(by: {($0.filename) < ($1.filename)})
+//                }
+//            case "Title":
+//                if !filesCV[selectedSubtableNumber].isEmpty {
+//                    filesCV[selectedSubtableNumber] = filesCV[selectedSubtableNumber].sorted(by: {$0.title! < $1.title!})
+//                }
+//            case "Year":
+//                if !filesCV[selectedSubtableNumber].isEmpty {
+//                    filesCV[selectedSubtableNumber] = filesCV[selectedSubtableNumber].sorted(by: {$0.year! < $1.year!})
+//                }
+//            case "Author":
+//                if !filesCV[selectedSubtableNumber].isEmpty {
+//                    filesCV[selectedSubtableNumber] = filesCV[selectedSubtableNumber].sorted(by: {($0.author)! < ($1.author)!})
+//                }
+//            case "Date modified":
+//                if !filesCV[selectedSubtableNumber].isEmpty {
+//                    filesCV[selectedSubtableNumber] = filesCV[selectedSubtableNumber].sorted(by: {$0.dateModified! < $1.dateModified!})
+//                }
+//            case "Rank":
+//                if !filesCV[selectedSubtableNumber].isEmpty {
+//                    filesCV[selectedSubtableNumber] = filesCV[selectedSubtableNumber].sorted(by: {$0.rank! < $1.rank!})
+//                }
+//            default:
+//                filesCV[selectedSubtableNumber] = filesCV[selectedSubtableNumber].sorted(by: {($0.filename) < ($1.filename)})
+//            }
+//        case "Manuscripts":
+//            for i in 0..<filesCV.count {
+//                filesCV[i] = filesCV[i].sorted(by: {($0.filename) < ($1.filename)})
+//            }
+//        default:
+//            print("Default sortItems 102")
+//        }
 
     }
     
@@ -2295,6 +2527,15 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         
     }
     
+    func populateExpenses() {
+        let currentProject = projectCD[selectedSubtableNumber]
+
+        let expenses = expensesCD.sorted(by: {$0.dateAdded! < $1.dateAdded!})
+        expensesTableView.reloadData()
+        
+//        let currentExpenses = currentProject.expense
+//        print(currentExpenses)
+    }
     
     
     
@@ -2302,245 +2543,296 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     
     // MARK: - Table view
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        switch categories[selectedCategoryNumber] {
-        case "Publications":
-            switch sortSubtableStrings[sortSubtableNumbers[selectedSubtableNumber]] {
-            case "Tag":
-                return sortTableTitles.count
-            case "Author":
-                return sortTableTitles.count
-            case "Journal":
-                return sortTableTitles.count
-            case "Year":
-                return sortTableTitles.count
-            case "Rank":
-                return sortTableTitles.count
-            default:
-                return 1
+
+        var number = 0
+        if tableView == self.expensesTableView {
+            if selectedSubtableNumber < projectCD.count {
+                number = (projectCD[selectedSubtableNumber].expense?.count)!
+            } else {
+                number = 0
             }
             
-        case "Manuscripts":
-            return sortTableTitles.count
-            
-        default:
-            print("Default 135")
-            return 1
+        } else if tableView == self.listTableView {
+            switch categories[selectedCategoryNumber] {
+            case "Publications":
+                number = sortTableTitles.count
+                
+            case "Economy":
+                number = projectCD.count
+                
+            default:
+                print("Default 135")
+                number = 0
+            }
         }
+        return number
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = listTableView.dequeueReusableCell(withIdentifier: "listTableCell") as! ListCell
+        
+        var cellToReturn = UITableViewCell()
+        
+        if tableView == self.expensesTableView {
+            let cell = expensesTableView.dequeueReusableCell(withIdentifier: "economyCell") as! EconomyCell
+            let currentProject = projectCD[selectedSubtableNumber]
+            if indexPath.row == 0 {
+                currentProject.amountRemaining = currentProject.amountReceived
+            }
+            let expenses = currentProject.expense?.allObjects as! [Expense]
+            cell.expenseAmount.text = "\(expenses[indexPath.row].amount)"
+            cell.overheadAmount.text = "\(expenses[indexPath.row].overhead)"
+            cell.commentString.text = expenses[indexPath.row].comment
+            cell.referenceString.text = expenses[indexPath.row].reference
+            print(indexPath.row)
+            print(currentProject.amountRemaining)
+            currentProject.amountRemaining = currentProject.amountRemaining - expenses[indexPath.row].amount
+            print(currentProject.amountRemaining)
+            amountRemainingString.text = "\(currentProject.amountRemaining)"
+            
+            cellToReturn = cell
+            
+        } else if tableView == self.listTableView {
 
-        switch categories[selectedCategoryNumber] {
-        case "Publications":
-            cell.listLabel.text = sortTableTitles[indexPath.row]
-            cell.listNumberOfItems.text = "\(filesCV[indexPath.row].count)"
+            let cell = listTableView.dequeueReusableCell(withIdentifier: "listTableCell") as! ListCell
             
-        case "Manuscripts":
-            cell.listLabel.text = sortTableTitles[indexPath.row]
-            cell.listNumberOfItems.text = "\(filesCV[indexPath.row].count)"
-            
-        default:
-            cell.listLabel.text = "Nothing yet"
-            cell.listNumberOfItems.text = "0 items"
+            switch categories[selectedCategoryNumber] {
+            case "Publications":
+                cell.listLabel.text = sortTableTitles[indexPath.row]
+                cell.listNumberOfItems.text = "\(filesCV[indexPath.row].count)"
+                
+            case "Economy":
+                cell.listLabel.text = sortTableTitles[indexPath.row]
+                cell.listNumberOfItems.text = ""
+                
+            case "ManuscriptsX": //FIX: Miss-spelled on purpose
+                cell.listLabel.text = sortTableTitles[indexPath.row]
+                cell.listNumberOfItems.text = "\(filesCV[indexPath.row].count)"
+                
+            default:
+                cell.listLabel.text = "Nothing yet..."
+                cell.listNumberOfItems.text = "0 items"
+            }
+            cellToReturn = cell
         }
-
-        return cell
+        
+        return cellToReturn
     }
     
     public func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         
         selectedSubtableNumber = indexPath.row
         
-        if categories[selectedCategoryNumber] == "Manuscripts" {
-            if sortSubtableStrings[sortSubtableNumbers[selectedCategoryNumber]] == "Normal view" {
-                // FIX: IF NO FILES EXISTS IN SECTION, cvIndexPath CANNOT BE CREATED (FIXED?)
+        if tableView == self.expensesTableView {
+            print("Default 148")
+        } else if tableView == self.listTableView {
+            switch categories[selectedCategoryNumber] {
+            case "Publications":
                 if filesCV[indexPath.row].count > 0 {
                     let cvIndexPath = IndexPath(item: 0, section: indexPath.row)
                     self.filesCollectionView.scrollToItem(at: cvIndexPath, at: .top, animated: true)
                 }
-            } else {
-                populateFilesCV()
-                filesCollectionView.reloadData()
-            }
-        } else {
-            // FIX: IF NO FILES EXISTS IN SECTION, cvIndexPath CANNOT BE CREATED (FIXED?)
-            if filesCV[indexPath.row].count > 0 {
-                let cvIndexPath = IndexPath(item: 0, section: indexPath.row)
-                self.filesCollectionView.scrollToItem(at: cvIndexPath, at: .top, animated: true)
+                
+            case "Economy":
+                let currentProject = projectCD[selectedSubtableNumber]
+                currencyString.text = currentProject.currency
+                amountReceivedString.text = "\(currentProject.amountReceived)"
+                amountRemainingString.text = "\(currentProject.amountRemaining)"
+                
+                self.expensesTableView.reloadData()
+                
+            case "ManuscriptsX": //FIX: Miss-spelled on purpose
+                if sortSubtableStrings[sortSubtableNumbers[selectedCategoryNumber]] == "Normal view" {
+                    // FIX: IF NO FILES EXISTS IN SECTION, cvIndexPath CANNOT BE CREATED (FIXED?)
+                    if filesCV[indexPath.row].count > 0 {
+                        let cvIndexPath = IndexPath(item: 0, section: indexPath.row)
+                        self.filesCollectionView.scrollToItem(at: cvIndexPath, at: .top, animated: true)
+                    }
+                } else {
+                    populateFilesCV()
+                    filesCollectionView.reloadData()
+                }
+            default:
+                print("Default 146")
             }
         }
         
     }
     
     func tableView(_ tableView: UITableView, performDropWith coordinator: UITableViewDropCoordinator) {
-        switch categories[selectedCategoryNumber] {
-        case "Publications":
-            if let row = coordinator.destinationIndexPath?.row {
-                switch sortSubtableStrings[sortSubtableNumbers[selectedSubtableNumber]] {
-                case "Tag":
-                    let groupName = sortTableTitles[row]
-                    if let filename = coordinator.items[0].dragItem.localObject {
-                        if let dragedPublication = filesCV[selectedSubtableNumber].first(where: {$0.filename == filename as! String}) {
-                            if let group = publicationGroupsCD.first(where: {$0.tag! == groupName}) {
-                                addPublicationToGroup(filename: (dragedPublication.filename), group: group)
-                            }
-                        }
-                    }
-                case "Author":
-                    let authorName = sortTableTitles[row]
-                    if let filename = coordinator.items[0].dragItem.localObject {
-                        if let dragedPublication = filesCV[selectedSubtableNumber].first(where: {$0.filename == filename as! String}) {
-                            assignPublicationToAuthor(filename: (dragedPublication.filename), authorName: authorName)
-                        }
-                    }
-                case "Journal":
-                    let journalName = sortTableTitles[row]
-                    if let filename = coordinator.items[0].dragItem.localObject {
-                        if let dragedPublication = filesCV[selectedSubtableNumber].first(where: {$0.filename == filename as! String}) {
-
-                            // CORE DATA
-                            if let cdFile = publicationsCD.first(where: {$0.filename == filename as! String}) {
-                                if let journal = journalsCD.first(where: {$0.name == journalName}) {
-                                    print(dragedPublication)
-                                    print(journalName)
-                                    cdFile.journal = journal
-                                    print("Added to journal: " + journal.name!)
-                                } else {
-                                    let newJournal = Journal(context: context)
-                                    newJournal.name = journalName
-                                    newJournal.sortNumber = "1"
-                                    print("Added new journal: " + newJournal.name!)
-                                    cdFile.journal = newJournal
-                                }
-                                saveCoreData()
-                                loadCoreData()
-                            }
-//                            assignPublicationToJournal(filename: (dragedPublication.filename), journalName: journalName)
-                            
-                            
-//                            if journalsCD.first(where: {$0.name == file.journal}) == nil {
-//                                let newJournal = Journal(context: context)
-//                                newJournal.name = journalString.text
-//                                newJournal.sortNumber = "1"
-//                                print("Added new journal: " + newJournal.name!)
-//                                currentPublication.journal = newJournal
-//                            } else {
-//                                currentPublication.journal = journalsCD.first(where: {$0.name == file.journal})
-//                                print("Added to journal: " + (currentPublication.journal?.name)!)
-//                            }
-                            
-                        }
-                    }
-                case "Year":
-                    let year = sortTableTitles[row]
-                    if let filename = coordinator.items[0].dragItem.localObject {
-                        if let dragedPublication = filesCV[selectedSubtableNumber].first(where: {$0.filename == filename as! String}) {
-                            
-//                            assignPublicationToJournal(filename: (dragedPublication.filename), journalName: journalName)
-                        }
-                    }
-                default:
-                    print("Default 141")
-                }
-            }
-        case "Manuscripts":
-            print("Manuscripts")
-        default:
-            print("Default 142")
-        }
-        
-        
-        populateFilesCV()
-        sortItems()
-        listTableView.reloadData()
-        filesCollectionView.reloadData()
-        
-    }
-    
-    func tableView(_ tableView: UITableView, canEditRowAt indexPath: IndexPath) -> Bool {
         if tableView == self.listTableView {
             switch categories[selectedCategoryNumber] {
             case "Publications":
-                switch sortSubtableStrings[sortSubtableNumbers[selectedSubtableNumber]] {
+                if let row = coordinator.destinationIndexPath?.row {
+                    switch sortSubtableStrings[sortSubtableNumbers[selectedSubtableNumber]] {
+                    case "Tag":
+                        let groupName = sortTableTitles[row]
+                        if let filename = coordinator.items[0].dragItem.localObject {
+                            if let dragedPublication = filesCV[selectedSubtableNumber].first(where: {$0.filename == filename as! String}) {
+                                if let group = publicationGroupsCD.first(where: {$0.tag! == groupName}) {
+                                    addPublicationToGroup(filename: (dragedPublication.filename), group: group)
+                                }
+                            }
+                        }
+                    case "Author":
+                        let authorName = sortTableTitles[row]
+                        if let filename = coordinator.items[0].dragItem.localObject {
+                            if let dragedPublication = filesCV[selectedSubtableNumber].first(where: {$0.filename == filename as! String}) {
+                                assignPublicationToAuthor(filename: (dragedPublication.filename), authorName: authorName)
+                            }
+                        }
+                    case "Journal":
+                        let journalName = sortTableTitles[row]
+                        if let filename = coordinator.items[0].dragItem.localObject {
+                            if let dragedPublication = filesCV[selectedSubtableNumber].first(where: {$0.filename == filename as! String}) {
+                                assignPublicationToJournal(filename: (dragedPublication.filename), journalName: journalName)
+                            }
+                        }
+                    case "Year":
+                        let year = sortTableTitles[row]
+                        if let filename = coordinator.items[0].dragItem.localObject {
+                            if let dragedPublication = filesCV[selectedSubtableNumber].first(where: {$0.filename == filename as! String}) {
+                                
+                                //                            assignPublicationToJournal(filename: (dragedPublication.filename), journalName: journalName)
+                            }
+                        }
+                    default:
+                        print("Default 141")
+                    }
+                }
+            case "Manuscripts":
+                print("Manuscripts")
+            default:
+                print("Default 142")
+            }
+            
+            
+            populateFilesCV()
+//            sortItems()
+            listTableView.reloadData()
+            filesCollectionView.reloadData()
+        }
+    }
+    
+    func tableView(_ tableView: UITableView, canEditRowAt indexPath: IndexPath) -> Bool {
+        var returnBool = false
+        
+        if tableView == self.listTableView {
+            switch categories[selectedCategoryNumber] {
+            case "Publications":
+                switch sortSubtableStrings[sortSubtableNumbers[selectedCategoryNumber]] {
                 case "Tag":
                     if indexPath.row > 1 {
-                        return true
+                        returnBool = true
                     } else {
-                        return false
+                        returnBool = false
                     }
                 case "Author":
                     if indexPath.row > 0 {
-                        return true
+                        returnBool = true
                     } else {
-                        return false
+                        returnBool = false
                     }
                 case "Journal":
                     if indexPath.row > 1 {
-                        return true
+                        returnBool = true
                     } else {
-                        return false
+                        returnBool = false
                     }
                 case "Year":
-                    return false
+                    returnBool = false
                 case "Rank":
-                    return false
+                    returnBool = false
                 default:
-                    return false
+                    returnBool = false
                 }
+            
             case "Manuscripts":
-                return false
+                returnBool = false
+            
+            case "Economy":
+                returnBool = true
+                
             default:
-                return false
+                returnBool = false
             }
-        } else {
-            return false
+        } else if tableView == self.expensesTableView {
+            returnBool = true
         }
+        return returnBool
     }
     
     func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCellEditingStyle, forRowAt indexPath: IndexPath) {
         if (editingStyle == .delete) {
-            print(sortTableTitles[indexPath.row])
             
-            //UPDATE selectedItem and selectedItemName for correct selected row
-            
-            switch categories[selectedCategoryNumber] {
-            case "Publications":
-                switch sortSubtableStrings[sortSubtableNumbers[selectedSubtableNumber]] {
-                case "Tag":
-                    let groupName = sortTableTitles[indexPath.row]
-                    let groupToDelete = publicationGroupsCD.first(where: {$0.tag! == groupName})
-                    let articlesBelongingToGroup = groupToDelete?.publication
-//                    context.delete(groupToDelete!)
-//                    for item in articlesBelongingToGroup! {
-//                        addOrRemoveFromUnfiledGroup(article: item as! Articles)
-//                    }
-//                    saveCoreData()
-//                    loadCoreData()
-//                    updateView(fileDeleted: false)
-                    print(groupName)
-                case "Author":
-                    let noAuthor = authorsCD.first(where: {$0.name == "No author"})
-                    let authorName = sortTableTitles[indexPath.row]
-                    let authorToDelete = authorsCD.first(where: {$0.name! == authorName})
-                    let articlesBelongingToAuthor = authorToDelete?.publication
-//                    context.delete(authorToDelete!)
-//                    for item in articlesBelongingToAuthor! {
-//                        let tmp = item as! Articles
-//                        tmp.author = noAuthor
-//                    }
+            if tableView == self.listTableView {
+                //UPDATE selectedItem and selectedItemName for correct selected row
+                
+                switch categories[selectedCategoryNumber] {
+                case "Publications":
+                    switch sortSubtableStrings[sortSubtableNumbers[selectedSubtableNumber]] {
+                    case "Tag":
+                        let groupName = sortTableTitles[indexPath.row]
+                        let groupToDelete = publicationGroupsCD.first(where: {$0.tag! == groupName})
+                        context.delete(groupToDelete!)
+                        saveCoreData()
+                        loadCoreData()
+                        
+                    case "Author":
+                        let noAuthor = authorsCD.first(where: {$0.name == "No author"})
+                        let authorName = sortTableTitles[indexPath.row]
+                        let authorToDelete = authorsCD.first(where: {$0.name! == authorName})
+                        let articlesBelongingToAuthor = authorToDelete?.publication
+                        context.delete(authorToDelete!)
+                        for item in articlesBelongingToAuthor! {
+                            let tmp = item as! Publication
+                            tmp.author = noAuthor
+                        }
+                        
+                        saveCoreData()
+                        loadCoreData()
+                        
+                    default:
+                        print("Default 103")
+                    }
+                    
+                    populateListTable()
+                    populateFilesCV()
+                    //                sortItems()
+                    
+                    listTableView.reloadData()
+                    filesCollectionView.reloadData()
+
+                case "Economy":
+                    let currentProject = sortTableTitles[indexPath.row]
+                    let projectToDelete = projectCD.first(where: {$0.name! == currentProject})
+                    context.delete(projectToDelete!)
                     
                     saveCoreData()
                     loadCoreData()
+
+                    populateListTable()
+                    categoriesCV.reloadData()
+                    listTableView.reloadData()
+                    expensesTableView.reloadData()
                     
-//                    updateView(fileDeleted: false)
-                    print(authorName)
                 default:
-                    print("Default 103")
+                    print("Default 104")
                 }
                 
-            default:
-                print("Default 104")
+                
+            } else if tableView == self.expensesTableView {
+                let currentProject = projectCD[selectedSubtableNumber]
+                var expenses = currentProject.expense?.allObjects as! [Expense]
+                
+                amountRemainingString.text = amountReceivedString.text
+                
+                let expenseToRemove = expensesCD.first(where: {$0.dateAdded! == expenses[indexPath.row].dateAdded!})
+                context.delete(expenseToRemove!)
+                
+                saveCoreData()
+                loadCoreData()
+                
+                expensesTableView.reloadData()
             }
         }
     }
@@ -2552,60 +2844,79 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
     // MARK: - Collection View
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         if collectionView == self.categoriesCV {
-            return 8
+            return categories.count
         } else {
             switch categories[selectedCategoryNumber] {
             case "Publications":
                 return filesCV[section].count
-            case "Manuscripts":
-                return filesCV[section].count
+//            case "Manuscripts":
+//                return filesCV[section].count
             default:
-                return 1
+                return 0
             }
         }
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         if collectionView == self.categoriesCV {
+            print(categories[indexPath.row])
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "categoryCell", for: indexPath) as! categoryCell
             switch categories[indexPath.row] {
+                
             case "Publications":
                 cell.icon.image = #imageLiteral(resourceName: "PublicationsIcon")
                 cell.icon.highlightedImage = #imageLiteral(resourceName: "PublicationsIconSelected")
-                cell.number.text = "\(filesCV[0].count)"
+                cell.number.text = "\(localFiles[0].count)"
+
+            case "Economy":
+                cell.icon.image = #imageLiteral(resourceName: "EconomyIcon")
+                cell.icon.highlightedImage = #imageLiteral(resourceName: "EconomyIconSelected")
+                cell.number.text = "\(projectCD.count)"
+                
             case "Manuscripts":
                 cell.icon.image = #imageLiteral(resourceName: "ManuscriptsIcon")
                 cell.icon.highlightedImage = #imageLiteral(resourceName: "ManuscriptsIconSelected")
-                cell.number.text = "\(filesCV[1].count)"
+                cell.number.text = "\(localFiles[2].count)"
+
             case "Patents":
                 cell.icon.image = #imageLiteral(resourceName: "PatentsIcon")
                 cell.icon.highlightedImage = #imageLiteral(resourceName: "PatentsIconSelected")
-                cell.number.text = "30"
+                cell.number.text = "\(localFiles[3].count)"
+                
             case "Proposals":
                 cell.icon.image = #imageLiteral(resourceName: "ProposalsIcon")
                 cell.icon.highlightedImage = #imageLiteral(resourceName: "ProposalsIconSelected")
-                cell.number.text = "3"
+                cell.number.text = "\(localFiles[4].count)"
+                
             case "Presentations":
                 cell.icon.image = #imageLiteral(resourceName: "PresentationsIcon")
                 cell.icon.highlightedImage = #imageLiteral(resourceName: "PresentationsIconSelected")
-                cell.number.text = "4"
+                cell.number.text = "\(localFiles[5].count)"
+                
             case "Teaching":
                 cell.icon.image = #imageLiteral(resourceName: "TeachingIcon")
                 cell.icon.highlightedImage = #imageLiteral(resourceName: "TeachingIconSelected")
-                cell.number.text = "4"
+                cell.number.text = "\(localFiles[6].count)"
+                
             case "Supervision":
                 cell.icon.image = #imageLiteral(resourceName: "SupervisionIcon")
                 cell.icon.highlightedImage = #imageLiteral(resourceName: "SupervisionIconSelected")
-                cell.number.text = "54"
+                cell.number.text = "0" // FIX
+                
             case "Miscellaneous":
                 cell.icon.image = #imageLiteral(resourceName: "MiscellaneousIcon")
                 cell.icon.highlightedImage = #imageLiteral(resourceName: "MiscellaneousIconSelected")
-                cell.number.text = "2"
+                cell.number.text = "0" // FIX
+                
             default:
+                print("Default 144")
                 cell.icon.image = #imageLiteral(resourceName: "PublicationsIcon")
-                cell.icon.highlightedImage = #imageLiteral(resourceName: "PublicationsIconSelected")
                 cell.number.text = "0"
             }
+            
+            selectedCategoryTitle.text = categories[selectedCategoryNumber]
+            
+//            cell.number.text = "\(localFiles[indexPath.row].count)"
             
             switch currentTheme {
             case 0:
@@ -2654,7 +2965,6 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                     cell.selectedFileFrame.isHidden = true
                 }
 
-                // FIX: Add so that selected cell has frame
                 
 //                switch sortCollectionViewStrings[sortCollectionViewNumbers[selectedCategoryNumber]] {
 //
@@ -2671,7 +2981,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
 //
 //                }
                 
-            case "Manuscripts":
+            case "ManuscriptsX": //FIX: Miss-spelled on purpose
                 cell.label.text = filesCV[indexPath.section][indexPath.row].filename
                 cell.hiddenFilename.text = filesCV[indexPath.section][indexPath.row].filename
                 cell.thumbnail.image = filesCV[indexPath.section][indexPath.row].thumbnail
@@ -2683,7 +2993,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                 }
 
             default:
-                print("107")
+                print("Default 107")
             }
             
             return cell
@@ -2695,22 +3005,11 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
         if collectionView == self.categoriesCV {
             selectedCategoryTitle.text = categories[indexPath.row]
             selectedCategoryNumber = indexPath.row
-            selectedSubtableNumber = 0
+            selectedSubtableNumber = 0 //FIX: Does this work? Maybe it should not be reset?
             
+//            kvStorage.set(selectedCategoryNumber, forKey: "selectedCategory")
             kvStorage.set(selectedCategoryNumber, forKey: "selectedCategory")
             kvStorage.synchronize()
-            
-//            switch categories[selectedCategoryNumber] {
-//            case "Publications":
-//                self.filesView.isHidden = true
-//                self.notesView.isHidden = false
-//            case "Manuscripts":
-//                self.filesView.isHidden = false
-//                self.notesView.isHidden = true
-//            default:
-//                self.filesView.isHidden = true
-//                self.notesView.isHidden = false
-//            }
             
             let selectedOption = segmentedControllTablesOrNotes.titleForSegment(at: segmentedControllTablesOrNotes.selectedSegmentIndex)
             switch selectedOption! {
@@ -2726,6 +3025,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                 case "Manuscripts", "Proposals", "Presentations":
                     notesView.isHidden = true
                     filesView.isHidden = false
+                case "Economy":
+                    notesView.isHidden = true
+                    filesView.isHidden = true
                 default:
                     notesView.isHidden = false
                     filesView.isHidden = true
@@ -2735,11 +3037,32 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                 print("Default 141")
             }
             
+            switch categories[selectedCategoryNumber] {
+            case "Economy":
+                self.economyView.isHidden = false
+                self.filesCollectionView.isHidden = true
+                self.segmentedControllTablesOrNotes.isHidden = true
+                self.economyHeader.isHidden = false
+                self.addNewGroupText.setTitle("New project", for: .normal)
+                self.filesView.isHidden = true
+                self.sortSTButton.isHidden = true
+            default:
+                self.economyView.isHidden = true
+                self.filesCollectionView.isHidden = false
+                self.segmentedControllTablesOrNotes.isHidden = false
+                self.economyHeader.isHidden = true
+                self.addNewGroupText.setTitle("New group", for: .normal)
+                self.filesView.isHidden = false
+                self.sortSTButton.isHidden = false
+            }
+            
+            
             setSortTableListStrings()
             setFilesCVSortingStrings()
+            
             populateListTable()
             populateFilesCV()
-            sortItems()
+//            sortItems()
             listTableView.reloadData()
             filesCollectionView.reloadData()
             
@@ -2767,7 +3090,8 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                 }
                 
                 populateFilesCV()
-                sortItems()
+//                sortItems()
+                
                 listTableView.reloadData()
                 filesCollectionView.reloadData()
                 
@@ -2775,11 +3099,15 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             } else {
                 
                 if currentCell.fileOffline.isHidden == false {
-                    print(currentCell.hiddenFilename.text)
+                    print("Downloading " + currentCell.hiddenFilename.text!)
                     let fileManager = FileManager.default
                     let fileURL = publicationsURL.appendingPathComponent("." + currentCell.hiddenFilename.text! + ".icloud")
                     do {
                         try fileManager.startDownloadingUbiquitousItem(at: fileURL)
+                        let newDownload = DownloadingFile(filename: currentCell.hiddenFilename.text!, url: fileURL, downloaded: false)
+                        filesDownloading.append(newDownload)
+                        downloadTimer = Timer.scheduledTimer(timeInterval: 2, target: self, selector: #selector(checkIfFileIsDownloaded), userInfo: nil, repeats: true)
+                        activityIndicator.startAnimating()
                     } catch let error {
                         print(error)
                     }
@@ -2802,13 +3130,9 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                         } else {
                             favoriteButton.setImage(#imageLiteral(resourceName: "FavoriteOff"), for: .normal)
                         }
-                        if let cdFile = publicationsCD.first(where: {$0.filename == currentSelectedFilename}) {
-                            print(currentSelectedFilename)
-                            print(cdFile.journal?.name)
-                        }
                     }
                 }
-//                filesCollectionView.reloadData()
+                filesCollectionView.reloadData() //Needed to show currently selected file
                 
             }
 
@@ -2875,7 +3199,7 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
             switch categories[selectedCategoryNumber] {
             case "Publications":
                 return sortTableTitles.count
-            case "Manuscripts":
+            case "ManuscriptsX": //FIX: Miss-spelled on purpose
                 switch sortSubtableStrings[sortSubtableNumbers[selectedCategoryNumber]] {
                 case "Normal view":
                     return sortTableTitles.count
@@ -2885,13 +3209,16 @@ class ViewController: UIViewController, UIDocumentPickerDelegate, UIPopoverPrese
                     return sortTableTitles.count
                 }
             default:
-                return sortTableTitles.count
+                return 0 //sortTableTitles.count
             }
         }
     }
 
     func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
         let sectionHeaderView = collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: "collectionViewHeader", for: indexPath) as! SectionHeaderView
+        
+        sectionHeaderView.backgroundColor = barColor
+        sectionHeaderView.tintColor = textColor
         
         switch categories[selectedCategoryNumber] {
         case "Publications":

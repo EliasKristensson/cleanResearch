@@ -20,6 +20,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var docURL: URL?
     var localURL: URL?
     var publicationURL: URL?
+    var projectURL: URL?
     var manuscriptURL: URL?
     var presentationURL: URL?
     var proposalsURL: URL?
@@ -36,6 +37,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         docURL = iCloudURL?.appendingPathComponent("Documents", isDirectory: true)
         
         publicationURL = docURL?.appendingPathComponent("Publications", isDirectory: true)
+        projectURL = docURL?.appendingPathComponent("Projects", isDirectory: true)
         manuscriptURL = docURL?.appendingPathComponent("Manuscripts", isDirectory: true)
         presentationURL = docURL?.appendingPathComponent("Presentations", isDirectory: true)
         proposalsURL = docURL?.appendingPathComponent("Proposals", isDirectory: true)
@@ -47,6 +49,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Create folders under iCloud Drive/cleanResearch/...
         do {
             try FileManager.default.createDirectory(at: publicationURL!, withIntermediateDirectories: false, attributes: nil)
+        } catch let error as NSError {
+            print(error.localizedDescription);
+        }
+        do {
+            try FileManager.default.createDirectory(at: projectURL!, withIntermediateDirectories: false, attributes: nil)
         } catch let error as NSError {
             print(error.localizedDescription);
         }
