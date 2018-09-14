@@ -8,6 +8,7 @@
 
 import UIKit
 import CoreData
+import CloudKit
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -15,82 +16,106 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var container: NSPersistentContainer!
     var context: NSManagedObjectContext!
 
+    var iCloudAvailable: Bool!
     var window: UIWindow?
     var iCloudURL: URL?
     var docURL: URL?
     var localURL: URL?
     var publicationURL: URL?
-    var projectURL: URL?
+    var economyURL: URL?
     var manuscriptURL: URL?
     var presentationURL: URL?
     var proposalsURL: URL?
     var supervisionURL: URL?
     var teachingURL: URL?
     var patentsURL: URL?
+    var coursesURL: URL?
     var miscellaneousURL: URL?
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplicationLaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
+        
+        
+        CKContainer.default().accountStatus{ status, error in
+            guard status == .available else {
+                print("Icloud is not available")
+                self.iCloudAvailable = false
+                return
+            }
+            print("Icloud is available")
+            self.iCloudAvailable = true
+        }
+        
         
         localURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
         iCloudURL = FileManager.default.url(forUbiquityContainerIdentifier: nil)
         docURL = iCloudURL?.appendingPathComponent("Documents", isDirectory: true)
         
         publicationURL = docURL?.appendingPathComponent("Publications", isDirectory: true)
-        projectURL = docURL?.appendingPathComponent("Projects", isDirectory: true)
+        economyURL = docURL?.appendingPathComponent("Economy", isDirectory: true)
         manuscriptURL = docURL?.appendingPathComponent("Manuscripts", isDirectory: true)
         presentationURL = docURL?.appendingPathComponent("Presentations", isDirectory: true)
         proposalsURL = docURL?.appendingPathComponent("Proposals", isDirectory: true)
         supervisionURL = docURL?.appendingPathComponent("Supervision", isDirectory: true)
         teachingURL = docURL?.appendingPathComponent("Teaching", isDirectory: true)
         patentsURL = docURL?.appendingPathComponent("Patents", isDirectory: true)
+        coursesURL = docURL?.appendingPathComponent("Courses", isDirectory: true)
         miscellaneousURL = docURL?.appendingPathComponent("Miscellaneous", isDirectory: true)
         
-        // Create folders under iCloud Drive/cleanResearch/...
-        do {
-            try FileManager.default.createDirectory(at: publicationURL!, withIntermediateDirectories: false, attributes: nil)
-        } catch let error as NSError {
-            print(error.localizedDescription);
-        }
-        do {
-            try FileManager.default.createDirectory(at: projectURL!, withIntermediateDirectories: false, attributes: nil)
-        } catch let error as NSError {
-            print(error.localizedDescription);
-        }
-        do {
-            try FileManager.default.createDirectory(at: manuscriptURL!, withIntermediateDirectories: false, attributes: nil)
-        } catch let error as NSError {
-            print(error.localizedDescription);
-        }
-        do {
-            try FileManager.default.createDirectory(at: presentationURL!, withIntermediateDirectories: false, attributes: nil)
-        } catch let error as NSError {
-            print(error.localizedDescription);
-        }
-        do {
-            try FileManager.default.createDirectory(at: proposalsURL!, withIntermediateDirectories: false, attributes: nil)
-        } catch let error as NSError {
-            print(error.localizedDescription);
-        }
-        do {
-            try FileManager.default.createDirectory(at: supervisionURL!, withIntermediateDirectories: false, attributes: nil)
-        } catch let error as NSError {
-            print(error.localizedDescription);
-        }
-        do {
-            try FileManager.default.createDirectory(at: teachingURL!, withIntermediateDirectories: false, attributes: nil)
-        } catch let error as NSError {
-            print(error.localizedDescription);
-        }
-        do {
-            try FileManager.default.createDirectory(at: patentsURL!, withIntermediateDirectories: false, attributes: nil)
-        } catch let error as NSError {
-            print(error.localizedDescription);
-        }
-        do {
-            try FileManager.default.createDirectory(at: miscellaneousURL!, withIntermediateDirectories: false, attributes: nil)
-        } catch let error as NSError {
-            print(error.localizedDescription);
+        if iCloudURL != nil {
+            // Create folders under iCloud Drive/cleanResearch/...
+            do {
+                try FileManager.default.createDirectory(at: publicationURL!, withIntermediateDirectories: false, attributes: nil)
+            } catch let error as NSError {
+                print(error.localizedDescription);
+            }
+            do {
+                try FileManager.default.createDirectory(at: economyURL!, withIntermediateDirectories: false, attributes: nil)
+            } catch let error as NSError {
+                print(error.localizedDescription);
+            }
+            do {
+                try FileManager.default.createDirectory(at: manuscriptURL!, withIntermediateDirectories: false, attributes: nil)
+            } catch let error as NSError {
+                print(error.localizedDescription);
+            }
+            do {
+                try FileManager.default.createDirectory(at: presentationURL!, withIntermediateDirectories: false, attributes: nil)
+            } catch let error as NSError {
+                print(error.localizedDescription);
+            }
+            do {
+                try FileManager.default.createDirectory(at: proposalsURL!, withIntermediateDirectories: false, attributes: nil)
+            } catch let error as NSError {
+                print(error.localizedDescription);
+            }
+            do {
+                try FileManager.default.createDirectory(at: supervisionURL!, withIntermediateDirectories: false, attributes: nil)
+            } catch let error as NSError {
+                print(error.localizedDescription);
+            }
+            do {
+                try FileManager.default.createDirectory(at: teachingURL!, withIntermediateDirectories: false, attributes: nil)
+            } catch let error as NSError {
+                print(error.localizedDescription);
+            }
+            do {
+                try FileManager.default.createDirectory(at: patentsURL!, withIntermediateDirectories: false, attributes: nil)
+            } catch let error as NSError {
+                print(error.localizedDescription);
+            }
+            do {
+                try FileManager.default.createDirectory(at: coursesURL!, withIntermediateDirectories: false, attributes: nil)
+            } catch let error as NSError {
+                print(error.localizedDescription);
+            }
+            do {
+                try FileManager.default.createDirectory(at: miscellaneousURL!, withIntermediateDirectories: false, attributes: nil)
+            } catch let error as NSError {
+                print(error.localizedDescription);
+            }
+        } else {
+            print("iCloud nil")
         }
         
         // Core data

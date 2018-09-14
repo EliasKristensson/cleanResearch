@@ -18,6 +18,8 @@ extension Notification.Name {
     static let settingsHighlighter = Notification.Name(rawValue: "settingsHighlighter")
     static let textViewDidChange = Notification.Name(rawValue: "textViewDidChange")
     static let closingPDF = Notification.Name(rawValue: "closingPDF")
+    static let closingInvoiceVC = Notification.Name(rawValue: "closingInvoiceVC")
+    
 //    static let allArticles = Notification.Name(rawValue: "All articles")
     //    static let updateArticle = Notification.Name(rawValue: "updateArticle")
 }

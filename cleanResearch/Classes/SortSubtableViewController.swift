@@ -28,6 +28,10 @@ class SortSubtableViewController: UIViewController {
         sortOptions.selectedSegmentIndex = sortValue
         
     }
+    
+    override func viewWillDisappear(_ animated: Bool) {
+        NotificationCenter.default.post(name: Notification.Name.sortSubtable, object: self)
+    }
 
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()

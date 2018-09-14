@@ -21,13 +21,16 @@ class PDFViewController: UIViewController, PDFViewDelegate {
     var highlightLine: [CGPoint]!
     var annotationsAdded: [PDFAnnotation]? = []
     var annotationsPages: [Int]? = []
+    var linkedAnnotations: [[Int]] = [[]]
+    var saveTimer: Timer!
+    var counter: [Int] = []
     
     var highlightingMode = false
     
     let thumbnailPanelSize = CGFloat(80)
     let sidebarBackgroundColor = UIColor.lightGray
 
-    var settingsBox = CGSize(width: 300, height: 350)
+    var settingsBox = CGSize(width: 300, height: 310)
     var highlighterColor = UIColor.yellow
     var type = "Straight"
     var thickness: CGFloat = 10
@@ -47,9 +50,7 @@ class PDFViewController: UIViewController, PDFViewDelegate {
     @IBOutlet weak var eraserIcon: UIBarButtonItem!
     
     @IBAction func undoTapped(_ sender: Any) {
-        if let latestAdded = annotationsAdded?.last {
-            pdfView.document?.page(at: (annotationsPages?.last)!)?.removeAnnotation(latestAdded)
-        }
+        undo()
     }
     
     @IBAction func togglePen(_ sender: Any) {
@@ -93,14 +94,6 @@ class PDFViewController: UIViewController, PDFViewDelegate {
         
     }
     
-    @IBAction func savePressed(_ sender: Any) {
-        if !document.write(to: document.documentURL!) {
-            print("Failed to save PDF")
-        } else {
-            print("Saved PDF")
-        }
-    }
-    
     @IBAction func toogleEraser(_ sender: Any) {
         highlighting = false
         freehand = false
@@ -127,7 +120,7 @@ class PDFViewController: UIViewController, PDFViewDelegate {
         
         navigationController?.isNavigationBarHidden = false
         navigationController?.navigationBar.barTintColor = UIColor.lightGray
-        navigationController?.navigationBar.tintColor = UIColor.white
+        navigationController?.navigationBar.tintColor = UIColor.black
         
         
         configureUI()
@@ -151,10 +144,21 @@ class PDFViewController: UIViewController, PDFViewDelegate {
 
         NotificationCenter.default.addObserver(self, selector: #selector(handleSettingsPopupClosing), name: Notification.Name.settingsHighlighter, object: nil)
         
+        saveTimer = Timer.scheduledTimer(timeInterval: 60, target: self, selector: #selector(saveDocument), userInfo: nil, repeats: true)
+        
     }
 
     
     
+    
+    @objc func saveDocument() {
+        
+        if !document.write(to: document.documentURL!) {
+            print("Failed to save PDF")
+        } else {
+            print("Saved PDF")
+        }
+    }
     
     private func configureUI() {
         
@@ -174,8 +178,9 @@ class PDFViewController: UIViewController, PDFViewDelegate {
 
         selections?.forEach({ selection in
             let highlight = PDFAnnotation(bounds: selection.bounds(for: page), forType: .highlight, withProperties: nil)
-            highlight.endLineStyle = .square
-            highlight.color = UIColor.yellow.withAlphaComponent(0.4)
+            highlight.color = highlighterColor
+            highlight.endLineStyle = .circle
+            highlight.color.withAlphaComponent(0.8)
 
             page.addAnnotation(highlight)
         })
@@ -187,7 +192,6 @@ class PDFViewController: UIViewController, PDFViewDelegate {
         thickness = settingsVC.thickness
         type = settingsVC.type
         annotationSettings = settingsVC.selectedSettings
-        print(type)
     }
     
     func setupThumbnailView() {
@@ -199,6 +203,20 @@ class PDFViewController: UIViewController, PDFViewDelegate {
         pdfThumbnailView.alpha = 0.9
         self.view.addSubview(pdfThumbnailView)
         pdfThumbnailView.isHidden = true
+    }
+    
+    func undo() {
+        if let annotationsToRemove = linkedAnnotations.last {
+            for _ in annotationsToRemove {
+                if let latestAdded = annotationsAdded?.last {
+                    pdfView.document?.page(at: (annotationsPages?.last)!)?.removeAnnotation(latestAdded)
+                    
+                    annotationsAdded?.removeLast()
+                    annotationsPages?.removeLast()
+                }
+            }
+            linkedAnnotations.removeLast()
+        }
     }
     
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
@@ -214,6 +232,8 @@ class PDFViewController: UIViewController, PDFViewDelegate {
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let currentPage = pdfView.currentPage else {return}
+        counter = []
+        counter.append(0)
         
         if freehand {
             if let touch = touches.first {
@@ -221,7 +241,6 @@ class PDFViewController: UIViewController, PDFViewDelegate {
                 var position = touch.location(in: annotationView)
                 position = pdfView.convert(position, to: currentPage)
                 annotationPath.move(to: position)
-                print("Pen")
             }
         }
         
@@ -233,31 +252,61 @@ class PDFViewController: UIViewController, PDFViewDelegate {
                     highlightLine = []
                     annotationPath = UIBezierPath()
                     highlightLine.append(position)
-                    print("Highlighting")
                     annotationPath.move(to: position)
+                    
+                    let tmpAnnotation = PDFAnnotation(bounds: CGRect(x: position.x, y: position.y-thickness/2, width: thickness-thickness/2, height: thickness), forType: .highlight, withProperties: nil)
+                    tmpAnnotation.color = highlighterColor
+                    tmpAnnotation.endLineStyle = .circle
+                    tmpAnnotation.color.withAlphaComponent(0.8)
+                    currentPage.addAnnotation(tmpAnnotation)
+                    let number = pdfView.currentPage?.pageRef?.pageNumber
+                    annotationsAdded?.append(tmpAnnotation)
+                    annotationsPages?.append(number!-1)
+
                 } else {
-                    let annotation = PDFAnnotation(bounds: CGRect(x: position.x, y: position.y, width: thickness-thickness/2, height: thickness-thickness/2), forType: .highlight, withProperties: nil)
+
+                    let annotation = PDFAnnotation(bounds: CGRect(x: position.x, y: position.y-thickness/2, width: thickness-thickness/2, height: thickness), forType: .highlight, withProperties: nil)
                     annotation.color = highlighterColor
                     annotation.endLineStyle = .circle
                     annotation.color.withAlphaComponent(0.8)
-                    annotation.add(annotationPath)
                     currentPage.addAnnotation(annotation)
+                    
+                    let number = pdfView.currentPage?.pageRef?.pageNumber
+                    annotationsAdded?.append(annotation)
+                    annotationsPages?.append(number!-1)
+
                 }
             }
         }
         
         if erasing {
+            guard let page = pdfView.currentPage else {return}
+            
             if let touch = touches.first {
+                var position = touch.location(in: pdfView)
+                position = pdfView.convert(position, to: page)
+                
+                let X = [-10, 5, 0, 5, 10]
+                for x in X {
+                    for y in X {
+                        let largePosition = CGPoint(x: position.x+CGFloat(x), y: position.y+CGFloat(y))
+                        if let tmp = pdfView.currentPage?.annotation(at: largePosition) {
+                            pdfView.currentPage?.removeAnnotation(tmp)
+                        }
+                    }
+                }
+                
+            }
+            /*
                 var position = touch.location(in: annotationView)
                 position = pdfView.convert(position, to: currentPage)
                 if let tmp = pdfView.currentPage?.annotation(at: position) {
                     pdfView.currentPage?.removeAnnotation(tmp)
                 }
-            }
+            */
         }
         
     }
-    
     
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
      
@@ -267,33 +316,28 @@ class PDFViewController: UIViewController, PDFViewDelegate {
                 var position = touch.location(in: annotationView)
                 position = pdfView.convert(position, to: currentPage)
                 annotationPath.addLine(to: position)
-                print(position)
             }
         }
         
         if highlighting {
             guard let currentPage = pdfView.currentPage else {return}
      
-            if type == "Swiggly" {
-                if let touch = touches.first {
-                    var position = touch.location(in: annotationView)
-                    position = pdfView.convert(position, to: currentPage)
-
-                    let annotation = PDFAnnotation(bounds: CGRect(x: position.x, y: position.y, width: thickness-thickness/2, height: thickness-thickness/2), forType: .highlight, withProperties: nil)
-                    annotation.color = highlighterColor
-                    annotation.endLineStyle = .circle
-                    annotation.color.withAlphaComponent(0.8)
-                    annotation.add(annotationPath)
-                    currentPage.addAnnotation(annotation)
-                }
-
-                /* ADDS A SQUARE WHEN HIGHLIGHTING
-                let annotation = PDFAnnotation(bounds: CGRect(x: position.x, y: position.y, width: thickness, height: thickness), forType: .highlight, withProperties: nil)
+            if let touch = touches.first {
+                var position = touch.location(in: annotationView)
+                position = pdfView.convert(position, to: currentPage)
+                
+                let annotation = PDFAnnotation(bounds: CGRect(x: position.x, y: position.y-thickness/2, width: thickness-thickness/2, height: thickness), forType: .highlight, withProperties: nil)
                 annotation.color = highlighterColor
                 annotation.endLineStyle = .circle
                 annotation.color.withAlphaComponent(0.8)
-                page.addAnnotation(annotation)
-                */
+                
+                currentPage.addAnnotation(annotation)
+                
+                counter.append(counter.last!+1)
+                let number = pdfView.currentPage?.pageRef?.pageNumber
+                annotationsAdded?.append(annotation)
+                annotationsPages?.append(number!-1)
+                
             }
         }
      
@@ -304,16 +348,20 @@ class PDFViewController: UIViewController, PDFViewDelegate {
                 var position = touch.location(in: pdfView)
                 position = pdfView.convert(position, to: page)
 
-//                let tmp = pdfView.currentSelection
-                if let tmp = pdfView.currentPage?.annotation(at: position) {
-                    pdfView.currentPage?.removeAnnotation(tmp)
+                let X = [-10, 5, 0, 5, 10]
+                for x in X {
+                    for y in X {
+                        let largePosition = CGPoint(x: position.x+CGFloat(x), y: position.y+CGFloat(y))
+                        if let tmp = pdfView.currentPage?.annotation(at: largePosition) {
+                            pdfView.currentPage?.removeAnnotation(tmp)
+                        }
+                    }
                 }
 
             }
         }
      
     }
-    
     
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         
@@ -326,8 +374,8 @@ class PDFViewController: UIViewController, PDFViewDelegate {
                 position = pdfView.convert(position, to: currentPage)
                 annotationPath.addLine(to: position)
                 
-                let pageBounds = currentPage.bounds(for: .artBox)
-                let inkAnnotation = PDFAnnotation(bounds: pageBounds, forType: .ink, withProperties: nil)
+                let bounds = annotationPath.bounds
+                let inkAnnotation = PDFAnnotation(bounds: bounds, forType: .ink, withProperties: nil)
                 inkAnnotation.add(annotationPath)
 //                inkAnnotation.border = b
                 inkAnnotation.color = .blue
@@ -335,6 +383,10 @@ class PDFViewController: UIViewController, PDFViewDelegate {
                 
                 currentPage.addAnnotation(inkAnnotation)
                 
+                let number = pdfView.currentPage?.pageRef?.pageNumber
+                linkedAnnotations.append(counter)
+                annotationsAdded?.append(inkAnnotation)
+                annotationsPages?.append(number!-1)
             }
         }
         
@@ -344,15 +396,26 @@ class PDFViewController: UIViewController, PDFViewDelegate {
                 if let touch = touches.first {
                     var position = touch.location(in: annotationView)
                     position = pdfView.convert(position, to: currentPage)
+                    
                     let annotation = PDFAnnotation(bounds: CGRect(x: position.x, y: position.y-thickness/2, width: thickness-thickness/2, height: thickness), forType: .highlight, withProperties: nil)
                     annotation.color = highlighterColor
                     annotation.endLineStyle = .circle
                     annotation.color.withAlphaComponent(0.8)
-                    annotation.add(annotationPath)
                     currentPage.addAnnotation(annotation)
+                    counter.append(counter.last!+1)
+                    linkedAnnotations.append(counter)
+
+                    let number = pdfView.currentPage?.pageRef?.pageNumber
+                    annotationsAdded?.append(annotation)
+                    annotationsPages?.append(number!-1)
+
                 }
             } else {
                 if let touch = touches.first {
+                    
+                    linkedAnnotations.append(counter)
+                    undo()
+                    
                     var position = touch.location(in: annotationView)
                     position = pdfView.convert(position, to: currentPage)
                     highlightLine.append(position)
@@ -360,31 +423,26 @@ class PDFViewController: UIViewController, PDFViewDelegate {
                     annotationPath.close()
                     
                     var width = highlightLine[1].x-highlightLine[0].x
+//                    var height = highlightLine[1].y-highlightLine[0].y
                     var start = 0
-                    if true {
-                        if highlightLine[1].x < highlightLine[0].x {
-                            width = highlightLine[0].x-highlightLine[1].x
-                            start = 1
-                        }
-                        
-                        let rect = CGRect(x: highlightLine[start].x, y: highlightLine[0].y-thickness/2, width: width, height: thickness)
-                        let annotation = PDFAnnotation(bounds: rect, forType: .highlight, withProperties: nil)
-                        annotation.color = highlighterColor
-                        annotation.endLineStyle = .circle
-                        annotation.color.withAlphaComponent(0.8)
-                        annotation.add(annotationPath)
-                        currentPage.addAnnotation(annotation)
-//                    annotationsAdded?.append(annotation)
-//                    let page = pdfView.currentPage?.pageRef
-//                    annotationsPages?.append(
-                    } else {
-                        
-                        let annotation = PDFAnnotation(bounds: CGRect(x: position.x, y: position.y, width: thickness, height: thickness), forType: .highlight, withProperties: nil)
-                        annotation.color = highlighterColor
-                        annotation.endLineStyle = .circle
-                        annotation.color.withAlphaComponent(0.8)
-                        currentPage.addAnnotation(annotation)
+                    if highlightLine[1].x < highlightLine[0].x {
+                        width = highlightLine[0].x-highlightLine[1].x
+                        start = 1
                     }
+                    
+                    let rect = CGRect(x: highlightLine[start].x, y: highlightLine[0].y-thickness/2, width: width, height: thickness)
+                    let annotation = PDFAnnotation(bounds: rect, forType: .highlight, withProperties: nil)
+                    annotation.color = highlighterColor
+                    annotation.endLineStyle = .circle
+                    annotation.color.withAlphaComponent(0.8)
+                    annotation.add(annotationPath)
+                    currentPage.addAnnotation(annotation)
+                    
+                    let number = pdfView.currentPage?.pageRef?.pageNumber
+                    linkedAnnotations.append([0])
+                    annotationsAdded?.append(annotation)
+                    annotationsPages?.append(number!-1)
+                    
                 }
             }
             
@@ -400,48 +458,11 @@ class PDFViewController: UIViewController, PDFViewDelegate {
     
     
     override func viewWillDisappear(_ animated: Bool) {
+        saveTimer.invalidate()
+        saveDocument()
         NotificationCenter.default.post(name: Notification.Name.closingPDF, object: self)
-//        if !document.write(toFile: (document.documentURL?.absoluteString)!) {
-//            print("Failed to save")
-//        } else {
-//            print("Saved")
-//        }
-        
-//        if let path = self.PDFurl, let document = self.document {
-////            document.write(toFile: "Test.pdf")
-//            if !document.write(toFile: path.absoluteString){
-//                print("Failed to save PDF")
-//            } else {
-//                print("Saved PDF to " + path.absoluteString)
-//            }
-//        } else {
-//            print("Nej")
-//        }
-//        NotificationCenter.default.post(name: Notification.Name.settingsCollectionView, object: self)
     }
-
-
+        
 }
 
-
-/*
- p = UIBezierPath()
- //        p.move(to: CGPoint(x: 400, y: 200))
- //        p.addLine(to: CGPoint(x: 500, y: 100))
- //        p.addLine(to: CGPoint(x: 400, y: 0))
- //        p.close()
- 
- //        let b = PDFBorder()
- //        b.lineWidth = 10.0
- 
- let pageBounds = currentPage.bounds(for: .artBox)
- let inkAnnotation = PDFAnnotation(bounds: pageBounds, forType: .ink, withProperties: nil)
- //        let inkAnnotation = PDFAnnotation(bounds: pageBounds, forType: .highlight, withProperties: nil)
- inkAnnotation.add(p)
- inkAnnotation.border = b
- inkAnnotation.color = .green
- inkAnnotation.color.withAlphaComponent(0.5)
- 
- currentPage.addAnnotation(inkAnnotation)
- */
 

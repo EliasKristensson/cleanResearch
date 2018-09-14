@@ -62,31 +62,31 @@ class PenSettingsViewController: UIViewController {
     
     
     @IBAction func thickness10(_ sender: Any) {
-        thickness = 10
+        thickness = 3
         unselectLine()
         thickness10Button.setImage(#imageLiteral(resourceName: "LineThickness10Selected@167"), for: .normal)
         selectedSettings[1] = 1
     }
     @IBAction func thickness15(_ sender: Any) {
-        thickness = 15
+        thickness = 5
         unselectLine()
         thickness15Button.setImage(#imageLiteral(resourceName: "LineThickness15Selected@167"), for: .normal)
         selectedSettings[1] = 2
     }
     @IBAction func thickness20(_ sender: Any) {
-        thickness = 20
+        thickness = 10
         unselectLine()
         thickness20Button.setImage(#imageLiteral(resourceName: "LineThickness20Selected@167"), for: .normal)
         selectedSettings[1] = 3
     }
     @IBAction func thickness25(_ sender: Any) {
-        thickness = 25
+        thickness = 12
         unselectLine()
         thickness25Button.setImage(#imageLiteral(resourceName: "LineThickness25Selected@167"), for: .normal)
         selectedSettings[1] = 4
     }
     @IBAction func thickness30(_ sender: Any) {
-        thickness = 30
+        thickness = 15
         unselectLine()
         thickness30Button.setImage(#imageLiteral(resourceName: "LineThickness30Selected@167"), for: .normal)
         selectedSettings[1] = 5
@@ -96,23 +96,14 @@ class PenSettingsViewController: UIViewController {
         type = "Swiggly"
         swigglyButton.setImage(#imageLiteral(resourceName: "HighlightSwigglySelected"), for: .normal)
         straightButton.setImage(#imageLiteral(resourceName: "HighlightStraight"), for: .normal)
-        selectedSettings[3] = 2
+        selectedSettings[2] = 2
     }
     
     @IBAction func straightHighlighter(_ sender: Any) {
         type = "Straight"
         swigglyButton.setImage(#imageLiteral(resourceName: "HighlightSwiggly"), for: .normal)
         straightButton.setImage(#imageLiteral(resourceName: "HighlightStraightSelected"), for: .normal)
-        selectedSettings[3] = 1
-    }
-    
-    @IBAction func saveTapped(_ sender: Any) {
-        self.dismiss(animated: true, completion: nil)
-    }
-    
-    
-    @IBAction func cancelTapped(_ sender: Any) {
-        self.dismiss(animated: true, completion: nil)
+        selectedSettings[2] = 1
     }
     
     
@@ -122,6 +113,7 @@ class PenSettingsViewController: UIViewController {
         unselectColors()
         unselectLine()
         
+        print(selectedSettings)
         
         switch selectedSettings[0] {
         case 1:
@@ -163,6 +155,7 @@ class PenSettingsViewController: UIViewController {
         }
     }
 
+    
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
         // Dispose of any resources that can be recreated.
