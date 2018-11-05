@@ -22,6 +22,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var docURL: URL?
     var localURL: URL?
     var publicationURL: URL?
+    var booksURL: URL?
     var economyURL: URL?
     var manuscriptURL: URL?
     var presentationURL: URL?
@@ -30,11 +31,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var teachingURL: URL?
     var patentsURL: URL?
     var coursesURL: URL?
+    var meetingsURL: URL?
+    var conferencesURL: URL?
+    var reviewsURL: URL?
     var miscellaneousURL: URL?
+    var docsDir: URL?
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplicationLaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
-        
         
         CKContainer.default().accountStatus{ status, error in
             guard status == .available else {
@@ -46,12 +50,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             self.iCloudAvailable = true
         }
         
-        
         localURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
         iCloudURL = FileManager.default.url(forUbiquityContainerIdentifier: nil)
         docURL = iCloudURL?.appendingPathComponent("Documents", isDirectory: true)
         
+        let tmp = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+        docsDir = tmp[0]
+        
         publicationURL = docURL?.appendingPathComponent("Publications", isDirectory: true)
+        booksURL = docURL?.appendingPathComponent("Books", isDirectory: true)
         economyURL = docURL?.appendingPathComponent("Economy", isDirectory: true)
         manuscriptURL = docURL?.appendingPathComponent("Manuscripts", isDirectory: true)
         presentationURL = docURL?.appendingPathComponent("Presentations", isDirectory: true)
@@ -60,12 +67,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         teachingURL = docURL?.appendingPathComponent("Teaching", isDirectory: true)
         patentsURL = docURL?.appendingPathComponent("Patents", isDirectory: true)
         coursesURL = docURL?.appendingPathComponent("Courses", isDirectory: true)
+        meetingsURL = docURL?.appendingPathComponent("Meetings", isDirectory: true)
+        conferencesURL = docURL?.appendingPathComponent("Conferences", isDirectory: true)
+        reviewsURL = docURL?.appendingPathComponent("Reviews", isDirectory: true)
         miscellaneousURL = docURL?.appendingPathComponent("Miscellaneous", isDirectory: true)
         
         if iCloudURL != nil {
             // Create folders under iCloud Drive/cleanResearch/...
             do {
                 try FileManager.default.createDirectory(at: publicationURL!, withIntermediateDirectories: false, attributes: nil)
+            } catch let error as NSError {
+                print(error.localizedDescription);
+            }
+            do {
+                try FileManager.default.createDirectory(at: booksURL!, withIntermediateDirectories: false, attributes: nil)
             } catch let error as NSError {
                 print(error.localizedDescription);
             }
@@ -106,6 +121,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             }
             do {
                 try FileManager.default.createDirectory(at: coursesURL!, withIntermediateDirectories: false, attributes: nil)
+            } catch let error as NSError {
+                print(error.localizedDescription);
+            }
+            do {
+                try FileManager.default.createDirectory(at: meetingsURL!, withIntermediateDirectories: false, attributes: nil)
+            } catch let error as NSError {
+                print(error.localizedDescription);
+            }
+            do {
+                try FileManager.default.createDirectory(at: conferencesURL!, withIntermediateDirectories: false, attributes: nil)
+            } catch let error as NSError {
+                print(error.localizedDescription);
+            }
+            do {
+                try FileManager.default.createDirectory(at: reviewsURL!, withIntermediateDirectories: false, attributes: nil)
             } catch let error as NSError {
                 print(error.localizedDescription);
             }

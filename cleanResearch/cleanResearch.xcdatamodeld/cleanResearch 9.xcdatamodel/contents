@@ -5,6 +5,13 @@
         <attribute name="sortNumber" optional="YES" attributeType="String" syncable="YES"/>
         <relationship name="publication" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Publication" inverseName="author" inverseEntity="Publication" syncable="YES"/>
     </entity>
+    <entity name="Bookmarks" representedClassName="Bookmarks" syncable="YES" codeGenerationType="class">
+        <attribute name="category" optional="YES" attributeType="String" syncable="YES"/>
+        <attribute name="filename" optional="YES" attributeType="String" syncable="YES"/>
+        <attribute name="folder" optional="YES" attributeType="String" syncable="YES"/>
+        <attribute name="lastPageVisited" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES" syncable="YES"/>
+        <attribute name="page" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES" syncable="YES"/>
+    </entity>
     <entity name="Expense" representedClassName="Expense" syncable="YES" codeGenerationType="class">
         <attribute name="active" optional="YES" attributeType="Boolean" usesScalarValueType="YES" syncable="YES"/>
         <attribute name="amount" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES" syncable="YES"/>
@@ -69,5 +76,6 @@
         <element name="Project" positionX="43" positionY="291" width="128" height="165"/>
         <element name="Publication" positionX="-63" positionY="-18" width="128" height="255"/>
         <element name="PublicationGroup" positionX="-326" positionY="162" width="128" height="103"/>
+        <element name="Bookmarks" positionX="-117" positionY="117" width="128" height="120"/>
     </elements>
 </model>
