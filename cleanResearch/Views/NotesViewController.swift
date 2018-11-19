@@ -12,9 +12,6 @@ class NotesViewController: UIViewController {
 
     var originalShortName: String!
     var originalFilename: String!
-//    var localFiles: [[LocalFile]]!
-//    var publicationsURL: URL!
-//    var docsURL: URL!
     var update = false
     var localFile: LocalFile!
     var index: Int?
@@ -178,13 +175,6 @@ class NotesViewController: UIViewController {
                             print(error)
                         }
                     }
-                    
-                    //
-                    //                currentSelectedFilename = localFiles[0][index!].filename
-                    //                populateFilesCV()
-                    //                sortFiles()
-                    //                filesCollectionView.reloadData()
-                    //                attemptScrolling(filename: localFiles[0][index!].filename)
                 }
             }
         }
@@ -213,11 +203,8 @@ class NotesViewController: UIViewController {
 
         checkIfFilenameIsOk()
         
-        if let index = dataManager.localFiles[0].index(where: { $0.filename == originalFilename } ) {
-            dataManager.localFiles[0][index] = localFile
-            if update {
-                dataManager.localFiles[0][index].dateModified = Date()
-            }
+        if update {
+            localFile.dateModified = Date()
         }
         
         NotificationCenter.default.post(name: Notification.Name.closingNotes, object: self)

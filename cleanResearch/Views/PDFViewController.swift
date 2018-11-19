@@ -15,11 +15,14 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
     var kvStorage: NSUbiquitousKeyValueStore!
     var drawView: DrawingView!
     var PDFfilename: String!
+    var iCloudURL: URL? //ADD
+    var localURL: URL? //ADD
     var document: PDFDocument!
     var pdfThumbnailView: PDFThumbnailView!
     var currentPage: PDFPage!
     var bookmarks: Bookmarks!
     var localCopy: Bool!
+    var currentFile: LocalFile!
 
     var changesMade = false
     var needsUploading = false
@@ -69,6 +72,9 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
     var currentTextAnnotation: PDFAnnotation!
     
     var annotationSettings: [Int]!
+    
+    var progressMonitor: ProgressMonitor!
+    var dataManager: DataManager!
     
     // 1: OUTLETS
     @IBOutlet weak var thumbnailIcon: UIBarButtonItem!
@@ -145,7 +151,8 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
     
     @IBAction func prevBookmarkTapped(_ sender: Any) {
         let currentPage = pdfView.currentPage?.pageRef?.pageNumber
-        let pastBookmarks = bookmarks.page?.filter{$0 < currentPage!}
+        var pastBookmarks = bookmarks.page?.filter{$0 < currentPage!}
+        pastBookmarks = pastBookmarks?.sorted()
         if let prevBookmark = pastBookmarks?.last {
             let page = pdfView.document?.page(at: prevBookmark-1)
             pdfView.go(to: page!)
@@ -154,7 +161,8 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
     
     @IBAction func nextBookmarkTapped(_ sender: Any) {
         let currentPage = pdfView.currentPage?.pageRef?.pageNumber
-        let commingBookmarks = bookmarks.page?.filter{$0 > currentPage!}
+        var commingBookmarks = bookmarks.page?.filter{$0 > currentPage!}
+        commingBookmarks = commingBookmarks?.sorted()
         if let nextBookmark = commingBookmarks?.first {
             let page = pdfView.document?.page(at: nextBookmark-1)
             pdfView.go(to: page!)
@@ -195,7 +203,7 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
         }
         
         if highlighting {
-            drawView.removeFromSuperview()
+//            drawView.removeFromSuperview()
             pdfView.bringSubview(toFront: pdfView)
         }
         
@@ -216,28 +224,29 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
         if freehand {
             penIcon.image = #imageLiteral(resourceName: "Pen-filled")
             penIcon.tintColor = UIColor.red
+            pdfView.isUserInteractionEnabled = false
         } else {
             penIcon.image = #imageLiteral(resourceName: "Pen")
             penIcon.tintColor = UIColor.black
+            pdfView.isUserInteractionEnabled = true
         }
         
         if freehand {
-            pdfView.isUserInteractionEnabled = false
-            drawView = DrawingView()
+//            drawView = DrawingView()
             drawView.frame = pdfView.frame
             drawView.isHidden = false
-            drawView.backgroundColor = UIColor.clear
+//            drawView.backgroundColor = UIColor.clear
             drawView.bringSubview(toFront: self.view)
-            drawView.delegate = self
-            drawView.pdfView = self.pdfView
+//            drawView.delegate = self
+//            drawView.pdfView = self.pdfView
             drawView.pdfPage = self.pdfView.currentPage
             drawView.drawColor = penColor
             drawView.thickness = penThickness * getScale()
-            drawView.isUserInteractionEnabled = true
-            self.view.addSubview(drawView)
+//            drawView.isUserInteractionEnabled = true
+//            self.view.addSubview(drawView)
         } else {
-            drawView.removeFromSuperview()
-            pdfView.isUserInteractionEnabled = true
+            drawView.isHidden = true
+//            drawView.removeFromSuperview()
             pdfView.bringSubview(toFront: pdfView)
         }
         
@@ -271,7 +280,7 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
         }
         
         if freehand {
-            drawView.removeFromSuperview()
+//            drawView.removeFromSuperview()
             pdfView.bringSubview(toFront: pdfView)
         }
         
@@ -300,20 +309,21 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
         }
         
         if highlighting {
-            drawView = DrawingView()
+//            drawView = DrawingView()
             drawView.frame = pdfView.frame
             drawView.isHidden = false
-            drawView.backgroundColor = UIColor.clear
+//            drawView.backgroundColor = UIColor.clear
             drawView.bringSubview(toFront: self.view)
-            drawView.delegate = self
-            drawView.pdfView = self.pdfView
+//            drawView.delegate = self
+//            drawView.pdfView = self.pdfView
             drawView.pdfPage = self.pdfView.currentPage
             drawView.drawColor = highlighterColor
             drawView.thickness = highlighterThickness * getScale()
-            drawView.isUserInteractionEnabled = true
-            self.view.addSubview(drawView)
+//            drawView.isUserInteractionEnabled = true
+//            self.view.addSubview(drawView)
         } else {
-            drawView.removeFromSuperview()
+            drawView.isHidden = true
+//            drawView.removeFromSuperview()
             pdfView.bringSubview(toFront: pdfView)
         }
         
@@ -339,7 +349,8 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
         }
         
         if highlighting || freehand {
-            drawView.removeFromSuperview()
+            drawView.isHidden = true
+//            drawView.removeFromSuperview()
             pdfView.bringSubview(toFront: pdfView)
         }
         
@@ -386,7 +397,8 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
     
     @IBAction func nextSearchResult(_ sender: Any) {
         let currentPage = pdfView.currentPage?.pageRef?.pageNumber
-        let commingSearchResults = searchPages.filter{$0 > currentPage!}
+        var commingSearchResults = searchPages.filter{$0 > currentPage!}
+        commingSearchResults = commingSearchResults.sorted()
         if let nextSearchResult = commingSearchResults.first {
             let page = pdfView.document?.page(at: nextSearchResult-1)
             pdfView.go(to: page!)
@@ -396,7 +408,8 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
     
     @IBAction func prevSearchResult(_ sender: Any) {
         let currentPage = pdfView.currentPage?.pageRef?.pageNumber
-        let prevSearchResults = searchPages.filter{$0 < currentPage!}
+        var prevSearchResults = searchPages.filter{$0 < currentPage!}
+        prevSearchResults = prevSearchResults.sorted()
         if let prevSearchResult = prevSearchResults.last {
             let page = pdfView.document?.page(at: prevSearchResult-1)
             pdfView.go(to: page!)
@@ -404,11 +417,11 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
         searchResultsBeforeOrAfter()
     }
     
-
     
     
     
     override func viewDidLoad() {
+        print("viewDidLoad - PDF")
         super.viewDidLoad()
         
         navigationController?.isNavigationBarHidden = false
@@ -432,6 +445,8 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(handleSettingsPopupClosing), name: Notification.Name.settingsHighlighter, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handlePageChange(notification:)), name: Notification.Name.PDFViewPageChanged, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(widgetTapped(notification:)), name: Notification.Name.PDFViewAnnotationHit, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(closeNotification), name: Notification.Name.notifactionExit, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(self.postNotification), name: Notification.Name.sendNotification, object: nil)
 
         
         if saveTime > 0 {
@@ -454,6 +469,17 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
         nextSearchResultButton.isEnabled = false
         prevSearchResultButton.isEnabled = false
         
+        drawView = DrawingView()
+        drawView.delegate = self
+        drawView.pdfView = self.pdfView
+        self.view.addSubview(drawView)
+        drawView.isHidden = true
+        drawView.isUserInteractionEnabled = true
+        drawView.backgroundColor = UIColor.clear
+        
+        self.view.addSubview(progressMonitor)
+        progressMonitor.isHidden = true
+        
     }
 
     
@@ -461,46 +487,16 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
     
     
     // MARK:- OBJECT C
-    @objc func saveDocument() {
-        if changesMade {
-            removeSearchResults()
-            
-            print("Save started")
-            let dispatchQueue = DispatchQueue(label: "QueueIdentification", qos: .background)
-            dispatchQueue.async{
-//            DispatchQueue.main.async {
-                if !self.document.write(to: self.document.documentURL!) {
-                    print("Failed to save PDF")
-                } else {
-                    self.changesMade = false
-                    print("Saved " + self.PDFfilename)
-                }
-            }
-        } else {
-            print("No changes made, not saving")
-        }
+    @objc func closeNotification() {
+//        progressMonitor.removeFromSuperview()
+        progressMonitor.isHidden = true
     }
-
-    @objc func highlightText() {
-        let selections = pdfView.currentSelection?.selectionsByLine()
-
-        guard let page = selections?.first?.pages.first else { return }
-
-        selections?.forEach({ selection in
-            let highlight = PDFAnnotation(bounds: selection.bounds(for: page), forType: .highlight, withProperties: nil)
-            highlight.color = highlighterColor
-            highlight.endLineStyle = .circle
-            highlight.color.withAlphaComponent(CGFloat(annotationSettings[4])/100)
-
-            page.addAnnotation(highlight)
-            
-            let number = pdfView.currentPage?.pageRef?.pageNumber
-            annotationsAdded?.append(highlight)
-            annotationsPages?.append(number!-1)
-            
-            changesMade = true
-            needsUploading = true
-        })
+    
+    @objc private func handlePageChange(notification: Notification)
+    {
+        if let _ = pdfView.currentPage?.pageRef?.pageNumber {
+            isCurrentPageBookmarked()
+        }
     }
     
     @objc func handleSettingsPopupClosing(notification: Notification) {
@@ -518,7 +514,7 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
         } else {
             saveTime = oldTme
         }
-
+        
         kvStorage.set(annotationSettings, forKey: "annotationSettings")
         kvStorage.synchronize()
         
@@ -548,6 +544,86 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
         
     }
     
+    @objc func highlightText() {
+        let selections = pdfView.currentSelection?.selectionsByLine()
+        
+        guard let page = selections?.first?.pages.first else { return }
+        
+        selections?.forEach({ selection in
+            let highlight = PDFAnnotation(bounds: selection.bounds(for: page), forType: .highlight, withProperties: nil)
+            highlight.color = highlighterColor
+            highlight.endLineStyle = .circle
+            highlight.color.withAlphaComponent(CGFloat(annotationSettings[4])/100)
+            
+            page.addAnnotation(highlight)
+            
+            let number = pdfView.currentPage?.pageRef?.pageNumber
+            annotationsAdded?.append(highlight)
+            annotationsPages?.append(number!-1)
+            
+            changesMade = true
+            needsUploading = true
+        })
+    }
+    
+    @objc func postNotification() {
+        DispatchQueue.main.async {
+            print("PDF VC")
+//            self.view.addSubview(self.progressMonitor)
+            self.progressMonitor.isHidden = false
+            self.progressMonitor.bringSubview(toFront: self.view)
+//            self.view.bringSubview(toFront: self.progressMonitor)
+            self.progressMonitor.launchMonitor(displayText: nil)
+        }
+    }
+    
+    @objc func saveDocument() {
+        if changesMade {
+            removeSearchResults()
+            
+//            self.view.bringSubview(toFront: progressMonitor)
+            self.progressMonitor.isHidden = false
+            self.progressMonitor.bringSubview(toFront: self.view)
+            dataManager.savePDF(file: currentFile, document: document)
+//            print("Save started")
+//            self.sendNotification(text: "Autosaving " + self.PDFfilename)
+//
+//            let dispatchQueue = DispatchQueue(label: "QueueIdentification", qos: .background)
+//            dispatchQueue.async{
+//                if self.iCloudURL != nil {
+//                    if !self.document.write(to: self.iCloudURL!) {
+//                        print("Failed to save PDF to iCloud drive")
+//                    } else {
+//                        self.changesMade = false
+//                        print("Saved " + self.PDFfilename + " to iCloud drive")
+//                        self.progressMonitor.text = "Saved " + self.PDFfilename + " to iCloud"
+//                        self.postNotification()
+//                    }
+//                }
+//                if self.localURL != nil {
+//                    if !self.document.write(to: self.localURL!) {
+//                        print("Failed to save PDF to local folder")
+//                    } else {
+//                        self.changesMade = false
+//                        print("Saved " + self.PDFfilename + " locally")
+//                        self.progressMonitor.text = "Saved " + self.PDFfilename + " locally"
+//                        self.postNotification()
+//                    }
+//                }
+//            }
+        } else {
+            print("No changes made, not saving")
+        }
+    }
+    
+    @objc func sendNotification(text: String) {
+//        self.view.addSubview(self.progressMonitor)
+//        self.view.bringSubview(toFront: self.progressMonitor)
+        self.progressMonitor.isHidden = false
+        self.progressMonitor.bringSubview(toFront: self.view)
+        self.progressMonitor.launchMonitor(displayText: text)
+    }
+    
     @objc func widgetTapped(notification: Notification) {
 
         if let tmp = notification.userInfo?["PDFAnnotationHit"] as? PDFAnnotation {
@@ -556,12 +632,6 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
         }
     }
 
-    @objc private func handlePageChange(notification: Notification)
-    {
-        if let _ = pdfView.currentPage?.pageRef?.pageNumber {
-            isCurrentPageBookmarked()
-        }
-    }
     
     
     
@@ -592,7 +662,6 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
         default:
             highlighterColor = UIColor(red: 255/255.0, green: 255/255.0, blue: 0/255.0, alpha: 0.4)
         }
-        print(annotationSettings)
         highlighterThickness = highlighterThicknesses[annotationSettings[1]]
         
         switch annotationSettings[2] {
@@ -880,6 +949,7 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
     
     
     
+    
     // MARK: - Touches
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let page = pdfView.currentPage else {return}
@@ -976,7 +1046,6 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
 
     override func viewWillDisappear(_ animated: Bool) {
         saveTimer.invalidate()
-        saveDocument()
         bookmarks.lastPageVisited = Int32((pdfView.currentPage?.pageRef?.pageNumber)!)
         NotificationCenter.default.post(name: Notification.Name.closingPDF, object: self)
     }

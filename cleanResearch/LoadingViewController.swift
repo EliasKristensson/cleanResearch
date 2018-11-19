@@ -14,7 +14,6 @@ import CloudKit
 class LoadingViewController: UIViewController {
 
     var appDelegate: AppDelegate!
-//    var startTimer: Timer!
     var icloudAvailable: Bool!
     let fileManagerDefault = FileManager.default
     var context: NSManagedObjectContext!
@@ -47,19 +46,15 @@ class LoadingViewController: UIViewController {
     
     var localFiles: [[LocalFile]] = [[]]
     
-    
-    @IBOutlet weak var loadingIndicator: UIActivityIndicatorView!
-    
-    
+    var progressMonitor = ProgressMonitor()
+    let progressMonitorSettings: [CGFloat] = [40, 300, 0.6, 0.8] //Height, Width, grayness, alpha
+
     
     
     
     override func viewDidLoad() {
         super.viewDidLoad()
         self.navigationController?.isNavigationBarHidden = true
-        
-        loadingIndicator.startAnimating()
-        loadingIndicator.bringSubview(toFront: self.view)
         
         let app = UIApplication.shared
         appDelegate = (app.delegate as! AppDelegate)
@@ -102,6 +97,7 @@ class LoadingViewController: UIViewController {
         dataManager.context = context
         dataManager.recordZone = recordZone
         dataManager.privateDatabase = privateDatabase
+        setupProgressMonitor()
         
 //        dataManager.icloudURL = iCloudURL //iCloudURL
         dataManager.docsURL = docsURL
@@ -123,15 +119,17 @@ class LoadingViewController: UIViewController {
         dataManager.reviewsURL = reviewsURL
         dataManager.miscellaneousURL = miscellaneousURL
         dataManager.categories = categories
-        
-        dataManager.readAllIcloudDriveFolders()
-        dataManager.loadCoreData()
-        dataManager.cleanOutEmptyDatabases()
+
+        if icloudAvailable {
+            sendNotification(text: "Reading iCloud drive folders")
+            dataManager.readAllIcloudDriveFolders()
+            dataManager.loadCoreData()
+//            dataManager.cleanOutEmptyDatabases()
+        }
         
         if !icloudAvailable! {
             alert(title: "iCloud Drive not available", message: "Log into your iCloud account and add iCloud Drive services")
         } else {
-            print("Segue Main VC")
             performSegue(withIdentifier: "loadMainVC", sender: self)
         }
         
@@ -139,8 +137,23 @@ class LoadingViewController: UIViewController {
     }
     
     
+    func sendNotification(text: String) {
+        
+        self.view.addSubview(progressMonitor)
+        self.view.bringSubview(toFront: progressMonitor)
+        progressMonitor.launchMonitor(displayText: text)
+        
+    }
     
-    
+    func setupProgressMonitor() {
+        progressMonitor.frame = CGRect(x: self.view.bounds.maxX/2 - progressMonitorSettings[1]/2, y: self.view.bounds.size.height+progressMonitorSettings[0], width: progressMonitorSettings[1], height: progressMonitorSettings[0])
+        progressMonitor.settings = progressMonitorSettings
+        progressMonitor.backgroundColor = UIColor(displayP3Red: progressMonitorSettings[2], green: progressMonitorSettings[2], blue: progressMonitorSettings[2], alpha: progressMonitorSettings[3])
+        progressMonitor.layer.cornerRadius = 12
+        progressMonitor.layer.borderWidth = 1
+        progressMonitor.layer.borderColor = UIColor(red:255/255, green:255/255, blue:255/255, alpha: progressMonitorSettings[3]).cgColor
+        progressMonitor.iPadDimension = [self.view.bounds.maxY, self.view.bounds.maxX]
+    }
     
     func alert(title: String, message: String) {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
@@ -152,11 +165,11 @@ class LoadingViewController: UIViewController {
     }
     
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        loadingIndicator.stopAnimating()
-        
         let destination = segue.destination as! ViewController
         destination.dataManager = dataManager
         destination.categories = categories
+        destination.progressMonitor = progressMonitor
+//        destination.progressMonitorSettings = progressMonitorSettings
     }
     
     override func didReceiveMemoryWarning() {

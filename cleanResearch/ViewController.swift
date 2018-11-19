@@ -26,7 +26,8 @@ class categoryCell: UICollectionViewCell {
     
     @IBOutlet weak var icon: UIImageView!
     @IBOutlet weak var number: UILabel!
-    var favoriteButton: UIButton!
+    @IBOutlet weak var saveNumber: UILabel!
+//    var favoriteButton: UIButton!
 }
 
 class SectionHeaderView: UICollectionReusableView {
@@ -98,13 +99,6 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
     
     // MARK: - Core data
     var context: NSManagedObjectContext!
-    var publicationsCD: [Publication] = []
-    var authorsCD: [Author] = []
-    var journalsCD: [Journal] = []
-    var publicationGroupsCD: [PublicationGroup] = []
-    var projectCD: [Project] = []
-    var expensesCD: [Expense] = []
-    var bookmarksCD: [Bookmarks] = []
     
     var currentIndexPath: IndexPath = IndexPath(row: 0, section: 0)
     
@@ -113,10 +107,6 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
     var documentPage = 0
     var iCloudURL: URL!
     var kvStorage: NSUbiquitousKeyValueStore!
-    var publicationsIC: [PublicationFile] = []
-    var projectsIC: [ProjectFile] = []
-    var expensesIC: [ExpenseFile] = []
-    var bookmarksIC: [BookmarkFile] = []
     var icloudAvailable: Bool? = nil
     var icloudFileURL: URL!
     var iCloudSynd = true
@@ -124,7 +114,8 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
     
     //MARK: - Custom classes/structs
     let fileHandler = FileHandler()
-    var dataManager = DataManager()
+    var dataManager: DataManager!
+    var progressMonitor: ProgressMonitor!
     
     //MARK: - Document directory
     var docsURL: URL!
@@ -147,7 +138,7 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
     var systemInfoBox = CGSize(width: 300, height: 50)
     var selectedCategoryNumber = 0
 
-    var localFiles: [[LocalFile]]!
+//    var localFiles: [[LocalFile]]!
     var filesCV: [[LocalFile]] = [[]] //Place files to be displayed in collection view here (ONLY PUBLICATIONS!)
     var docCV: [DocCV] = []
     let sortSubtableStrings = ["Tag", "Author", "Journal", "Year", "Rank"] //Only for publications
@@ -180,7 +171,7 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
     var barColor: UIColor!
     
     var searchHidden = true
-    var isSearching = false
+//    var isSearching = false
     
     var originalFilename: String!
     var originalShortName: String!
@@ -240,17 +231,15 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
             favoriteButton.tintColor = UIColor.white
         }
         
-        for i in 0..<localFiles[0].count {
-            if localFiles[0][i].filename == filename {
-                localFiles[0][i] = selectedLocalFile
+        for i in 0..<dataManager.localFiles[0].count {
+            if dataManager.localFiles[0][i].filename == filename {
+                dataManager.localFiles[0][i] = selectedLocalFile
             }
         }
         
         selectedLocalFile = dataManager.addOrRemoveFromFavorite(file: selectedLocalFile)
         dataManager.replaceLocalFileWithNew(newFile: selectedLocalFile)
         dataManager.updateIcloud(file: selectedLocalFile, oldFilename: nil, newFilename: nil, expense: nil, project: nil, type: "Publications", bookmark: nil)
-        
-//        dataManager.update
         
         populateListTable()
         populateFilesCV()
@@ -283,6 +272,8 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                         self.selectedLocalFile.downloaded = true
                         self.dataManager.replaceLocalFileWithNew(newFile: self.selectedLocalFile)
                         self.downloadToLocalFileBUtton.image = #imageLiteral(resourceName: "HDD-filled")
+                        self.sendNotification(text: self.selectedLocalFile.filename + " saved locally")
+
                     }
                 } else {
                     self.alert(title: "Read issue", message: "Failed to read PDF")
@@ -290,11 +281,11 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                 
             } else {
                 do {
-                    print(self.selectedLocalFile.localURL)
                     try self.fileManagerDefault.removeItem(at: self.selectedLocalFile.localURL)
                     self.selectedLocalFile.downloaded = false
                     self.dataManager.replaceLocalFileWithNew(newFile: self.selectedLocalFile)
                     self.downloadToLocalFileBUtton.image = #imageLiteral(resourceName: "DownloadPDF")
+                    self.sendNotification(text: self.selectedLocalFile.filename + " local save removed")
                 } catch {
                     self.alert(title: "Delete issue", message: "Failed to delete PDF")
                     print("Error: \(error.localizedDescription)")
@@ -325,7 +316,6 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
         
         dataManager.addExpense(amount: amount, OH: OH, comment: comment, reference: reference)
         
-        readDatabases()
         self.expensesTableView.reloadData()
     }
     
@@ -415,10 +405,10 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
     @IBAction func searchButtonTapped(_ sender: Any) {
         searchHidden = !searchHidden
         searchBar.isHidden = searchHidden
-        isSearching = !searchHidden
+        dataManager.isSearching = !searchHidden
         searchBar.text = ""
         
-        if !isSearching {
+        if !dataManager.isSearching {
             populateListTable()
             populateFilesCV()
             sortFiles()
@@ -431,11 +421,12 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
     
     
     
+    
     // MARK: - ViewDidLoad
     override func viewDidLoad() {
+        print("viewDidLoad - Main")
         super.viewDidLoad()
         
-
         //MARK: - AppDelegate
         let app = UIApplication.shared
         appDelegate = (app.delegate as! AppDelegate)
@@ -444,6 +435,7 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
         
         //DATABASE MANAGER
         dataManager.context = context
+        dataManager.progressMonitor = progressMonitor
 
         self.categoriesCV.delegate = self
         self.categoriesCV.dataSource = self
@@ -483,6 +475,9 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
         NotificationCenter.default.addObserver(self, selector: #selector(self.handleNotesClosing), name: Notification.Name.closingNotes, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(self.icloudFinishedLoading), name: Notification.Name.icloudFinished, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(self.reload), name: Notification.Name.reload, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(self.closeNotification), name: Notification.Name.notifactionExit, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(self.postNotification), name: Notification.Name.sendNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(self.updateView), name: Notification.Name.updateView, object: nil)
 
         
         // Touch gestures
@@ -518,7 +513,10 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
             searchForFilesTimer.invalidate()
         }
         
-//        performSegue(withIdentifier: "segueSystemInfo", sender: self)
+        self.view.addSubview(self.progressMonitor)
+        
+//        self.dataManager.deleteAlliCloudRecords()
+        
         
     }
     
@@ -527,7 +525,116 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
     
     
     
+    
     // MARK: - OBJECT C FUNCTIONS
+    @objc func checkForNewFiles() {
+        dataManager.checkForNewFiles()
+    }
+    
+    @objc func checkIfFileIsDownloaded() {
+        var stillDownloading = false
+        for i in 0..<filesDownloading.count {
+            if !filesDownloading[i].downloaded {
+                do {
+                    let file = filesDownloading[i]
+                    var filename = file.url.deletingPathExtension().lastPathComponent
+                    filename.remove(at: filename.startIndex)
+                    let folder = file.url.deletingLastPathComponent()
+                    let filePath = folder.appendingPathComponent(filename).path
+                    print(filePath)
+                    let exist = fileManagerDefault.fileExists(atPath: filePath)
+                    
+                    if !exist {
+                        stillDownloading = true
+                    } else {
+                        
+                        sendNotification(text: filename + " downloaded")
+                        
+                        filesDownloading[i].downloaded = true
+                        
+                        dataManager.reloadLocalFiles(category: filesDownloading[i].category)
+                        if categories[filesDownloading[i].category] == "Publications" {
+                            dataManager.compareLocalFilesWithDatabase()
+                        }
+                        
+                        NotificationCenter.default.post(name: Notification.Name.updateView, object: nil)
+                        
+                        populateListTable()
+                        populateFilesCV()
+                        sortFiles()
+                        
+                        listTableView.reloadData()
+                        filesCollectionView.reloadData()
+                        
+                    }
+                }
+            }
+            
+        }
+        
+        if !stillDownloading {
+            downloadTimer.invalidate()
+        }
+        
+        
+    }
+    
+    @objc func closeNotification() {
+//        progressMonitor.removeFromSuperview()
+    }
+
+    @objc func doubleTapped(gesture: UITapGestureRecognizer) {
+        
+        let pointInCollectionView = gesture.location(in: self.filesCollectionView)
+        if let indexPath = self.filesCollectionView.indexPathForItem(at: pointInCollectionView) {
+            switch categories[selectedCategoryNumber] {
+            case "Publications":
+                selectedLocalFile = filesCV[indexPath.section][indexPath.row]
+                
+                if selectedLocalFile.downloaded {
+                    PDFdocument = PDFDocument(url: selectedLocalFile.localURL)
+                } else {
+                    PDFdocument = PDFDocument(url: selectedLocalFile.iCloudURL)
+                }
+                
+                performSegue(withIdentifier: "seguePDFViewController", sender: self)
+                
+            case "Books":
+                selectedLocalFile = docCV[selectedSubtableNumber].files[indexPath.section][indexPath.row]
+                
+                if selectedLocalFile.downloaded {
+                    PDFdocument = PDFDocument(url: selectedLocalFile.localURL)
+                } else {
+                    PDFdocument = PDFDocument(url: selectedLocalFile.iCloudURL)
+                }
+                
+                if let currentBook = dataManager.booksCD.first(where: {$0.filename == selectedLocalFile.filename}) {
+                    print("Book saved already to CD")
+                } else {
+                    dataManager.addFileToCoreData(file: selectedLocalFile)
+                }
+                
+                performSegue(withIdentifier: "seguePDFViewController", sender: self)
+                
+            default:
+                
+                selectedLocalFile = docCV[selectedSubtableNumber].files[indexPath.section][indexPath.row]
+                
+                if selectedLocalFile.downloaded {
+                    PDFdocument = PDFDocument(url: selectedLocalFile.localURL)
+                    performSegue(withIdentifier: "seguePDFViewController", sender: self)
+                } else if selectedLocalFile.iCloudURL.lastPathComponent.range(of: ".pdf") != nil {
+                    PDFdocument = PDFDocument(url: selectedLocalFile.iCloudURL)
+                    performSegue(withIdentifier: "seguePDFViewController", sender: self)
+                } else {
+                    previewFile = selectedLocalFile
+                    previewController.reloadData()
+                    navigationController?.pushViewController(previewController, animated: true)
+                }
+            }
+        }
+    }
+    
     @objc func handleSettingsPopupClosing(notification: Notification) {
         let settingsVC = notification.object as! SettingsViewController
         iCloudSynd = settingsVC.syncWithIcloud.isOn
@@ -543,6 +650,47 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
         kvStorage.set(settingsVC.scanForNewFiles.isOn, forKey: "scanForFiles")
         kvStorage.set(iCloudSynd, forKey: "iCloudSynd")
         kvStorage.synchronize()
+    }
+    
+    @objc func handlePDFClosing(notification: Notification) {
+        
+        self.navigationController?.isNavigationBarHidden = false
+        self.navigationItem.hidesBackButton = true
+        self.navigationController?.navigationBar.barTintColor = UIColor.black
+        self.navigationController?.navigationBar.backgroundColor = UIColor.black
+        self.navigationController?.navigationBar.tintColor = UIColor.white
+        
+        let vc = notification.object as! PDFViewController
+        annotationSettings = vc.annotationSettings!
+        
+        kvStorage.set(annotationSettings, forKey: "annotationSettings")
+        kvStorage.synchronize()
+        
+        if let index = dataManager.localFiles[selectedCategoryNumber].index(where: {$0.filename == vc.PDFfilename}) {
+            dataManager.localFiles[selectedCategoryNumber][index].dateModified = Date()
+            dataManager.localFiles[selectedCategoryNumber][index].thumbnail = fileHandler.getThumbnail(icloudURL: vc.document.documentURL!, localURL: dataManager.localFiles[selectedCategoryNumber][index].localURL, localExist: fileManagerDefault.fileExists(atPath: dataManager.localFiles[selectedCategoryNumber][index].localURL.path), pageNumber: 0)
+            
+            if vc.needsUploading {
+                dataManager.savePDF(file: vc.currentFile, document: vc.document)
+            }
+            
+            dataManager.saveBookmark(file: dataManager.localFiles[selectedCategoryNumber][index], bookmark: vc.bookmarks)
+            
+            if categories[selectedCategoryNumber] == "Publications" {
+                dataManager.updateIcloud(file: dataManager.localFiles[selectedCategoryNumber][index], oldFilename: nil, newFilename: nil, expense: nil, project: nil, type: "Publications", bookmark: nil)
+                dataManager.updateCoreData(file: dataManager.localFiles[selectedCategoryNumber][index], oldFilename: nil, newFilename: nil)
+            }
+            
+            populateListTable()
+            populateFilesCV()
+            sortFiles()
+            listTableView.reloadData()
+            filesCollectionView.reloadData()
+            
+        } else {
+            print("Not uploaded to iCloud")
+            print(iCloudSynd)
+        }
     }
     
     @objc func handleSorttablePopupClosing(notification: Notification) {
@@ -594,6 +742,10 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
         
         if vc.update {
             let currentFile = vc.localFile
+            
+            if let index = dataManager.localFiles[0].index(where: {$0.filename == currentFile?.filename}) {
+                dataManager.localFiles[0][index] = currentFile!
+            }
 
             if vc.filenameChanged {
                 print("Filename changed")
@@ -612,77 +764,14 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                 
             } else {
                
-                dataManager.updateCoreData(file: currentFile!, oldFilename: nil, newFilename: nil)
 
                 dataManager.updateIcloud(file: currentFile!, oldFilename: nil, newFilename: nil, expense: nil, project: nil, type: "Publications", bookmark: nil)
-                
-                populateListTable()
-                populateFilesCV()
-                sortFiles()
-                
-                listTableView.reloadData()
-                filesCollectionView.reloadData()
-            }
-        }
-    }
-    
-    @objc func handlePDFClosing(notification: Notification) {
-        
-        self.navigationController?.isNavigationBarHidden = false
-        self.navigationItem.hidesBackButton = true
-        self.navigationController?.navigationBar.barTintColor = UIColor.black
-        self.navigationController?.navigationBar.backgroundColor = UIColor.black
-        self.navigationController?.navigationBar.tintColor = UIColor.white
-        
-        let vc = notification.object as! PDFViewController
-        annotationSettings = vc.annotationSettings!
+                dataManager.updateCoreData(file: currentFile!, oldFilename: nil, newFilename: nil)
 
-        kvStorage.set(annotationSettings, forKey: "annotationSettings")
-        kvStorage.synchronize()
-        
-        var update = false
-        if let index = dataManager.localFiles[selectedCategoryNumber].index(where: {$0.filename == vc.PDFfilename}) {
-            dataManager.localFiles[selectedCategoryNumber][index].dateModified = Date()
-            dataManager.localFiles[selectedCategoryNumber][index].thumbnail = fileHandler.getThumbnail(icloudURL: vc.document.documentURL!, localURL: dataManager.localFiles[selectedCategoryNumber][index].localURL, localExist: fileManagerDefault.fileExists(atPath: dataManager.localFiles[selectedCategoryNumber][index].localURL.path), pageNumber: 0)
-            update = true
-            
-            if dataManager.localFiles[selectedCategoryNumber][index].downloaded {
-                
-                if vc.needsUploading && iCloudSynd {
-                    DispatchQueue.main.async {
-                        let document = vc.document
-                        if !(document?.write(to: self.dataManager.localFiles[self.selectedCategoryNumber][index].iCloudURL))! {
-                            print("Failed to save PDF")
-                        } else {
-                            print("Saved PDF to iCloud")
-                            self.dataManager.localFiles[self.selectedCategoryNumber][index].uploaded = Date()
-                        }
-                    }
-                } else {
-                    print("Not uploaded to iCloud")
-                    print(iCloudSynd)
-                }
-            }
-            
-            if update {
-                
-                if let currentBookmark = bookmarksCD.first(where: {$0.path == PDFPath!}) {
-                    print(currentBookmark)
-                    currentBookmark.lastPageVisited = vc.bookmarks.lastPageVisited
-                    currentBookmark.page = vc.bookmarks.page
-                    dataManager.saveCoreData()
-                    dataManager.loadCoreData()
-                    dataManager.updateIcloud(file: nil, oldFilename: nil, newFilename: nil, expense: nil, project: nil, type: "Bookmarks", bookmark: currentBookmark)
-                }
-                
-                if categories[selectedCategoryNumber] == "Publications" {
-                    dataManager.updateIcloud(file: localFiles[selectedCategoryNumber][index], oldFilename: nil, newFilename: nil, expense: nil, project: nil, type: "Publications", bookmark: nil)
-                    dataManager.updateCoreData(file: localFiles[selectedCategoryNumber][index], oldFilename: nil, newFilename: nil)
-                }
-                
                 populateListTable()
                 populateFilesCV()
                 sortFiles()
+                
                 listTableView.reloadData()
                 filesCollectionView.reloadData()
             }
@@ -698,109 +787,17 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
         self.expensesTableView.reloadData()
     }
     
-    @objc func doubleTapped(gesture: UITapGestureRecognizer) {
-        
-        let pointInCollectionView = gesture.location(in: self.filesCollectionView)
-        switch categories[selectedCategoryNumber] {
-        case "Publications":
-            if let indexPath = self.filesCollectionView.indexPathForItem(at: pointInCollectionView) {
-                let selectedCell = filesCV[indexPath.section][indexPath.row]
-                icloudFileURL = filesCV[indexPath.section][indexPath.row].iCloudURL
-                localFileURL = filesCV[indexPath.section][indexPath.row].localURL
-                
-                if filesCV[indexPath.section][indexPath.row].downloaded {
-                    PDFdocument = PDFDocument(url: localFileURL)
-                } else {
-                    PDFdocument = PDFDocument(url: icloudFileURL)
-                }
-                
-                PDFfilename = selectedCell.filename
-                PDFPath = filesCV[indexPath.section][indexPath.row].path //"Publications"
-                NotificationCenter.default.post(name: Notification.Name.sendPDFfilename, object: self)
-                performSegue(withIdentifier: "seguePDFViewController", sender: self)
-            }
-        default:
-            let pointInCollectionView = gesture.location(in: self.filesCollectionView)
-            if let indexPath = self.filesCollectionView.indexPathForItem(at: pointInCollectionView) {
-                icloudFileURL = docCV[selectedSubtableNumber].files[indexPath.section][indexPath.row].iCloudURL
-                localFileURL = docCV[selectedSubtableNumber].files[indexPath.section][indexPath.row].localURL
-
-                let currentFile = docCV[selectedSubtableNumber].files[indexPath.section][indexPath.row]
-                PDFfilename = currentFile.filename
-                PDFPath = currentFile.path
-                if docCV[selectedSubtableNumber].files[indexPath.section][indexPath.row].downloaded {
-                    PDFdocument = PDFDocument(url: localFileURL)
-                    NotificationCenter.default.post(name: Notification.Name.sendPDFfilename, object: self)
-                    performSegue(withIdentifier: "seguePDFViewController", sender: self)
-                } else if icloudFileURL.lastPathComponent.range(of: ".pdf") != nil {
-                    folderURL = currentFile.path
-                    PDFdocument = PDFDocument(url: icloudFileURL)
-                    NotificationCenter.default.post(name: Notification.Name.sendPDFfilename, object: self)
-                    performSegue(withIdentifier: "seguePDFViewController", sender: self)
-                } else {
-                    previewFile = docCV[selectedSubtableNumber].files[indexPath.section][indexPath.row]
-                    previewController.reloadData()
-                    navigationController?.pushViewController(previewController, animated: true)
-                }
-                
-            }
-
-        }
-    }
-    
-    @objc func checkIfFileIsDownloaded() {
-        var stillDownloading = false
-        for i in 0..<filesDownloading.count {
-            if !filesDownloading[i].downloaded {
-                do {
-                    let file = filesDownloading[i]
-                    var filename = file.url.deletingPathExtension().lastPathComponent
-                    filename.remove(at: filename.startIndex)
-                    let folder = file.url.deletingLastPathComponent()
-                    let filePath = folder.appendingPathComponent(filename).path
-                    print(filePath)
-                    let exist = fileManagerDefault.fileExists(atPath: filePath)
-                    
-                    if !exist {
-                        stillDownloading = true
-                    } else {
-                        filesDownloading[i].downloaded = true
-
-                        dataManager.readAllIcloudDriveFolders()
-                        dataManager.compareLocalFilesWithDatabase()
-                        
-                        populateListTable()
-                        populateFilesCV()
-                        sortFiles()
-                        
-                        listTableView.reloadData()
-                        filesCollectionView.reloadData()
-                        
-                    }
-                }
-            }
-
-        }
-        
-        if !stillDownloading {
-            downloadTimer.invalidate()
-        }
-        
-        
-    }
-    
-    @objc func checkForNewFiles() {
-        dataManager.checkForNewFiles()
-    }
-    
     @objc func handleLongPress(gesture : UILongPressGestureRecognizer!) {
-
+        
         let point = gesture.location(in: self.categoriesCV)
         
         if let indexPath = self.categoriesCV.indexPathForItem(at: point) {
-
+            
+            sendNotification(text: "Reloading " + categories[selectedCategoryNumber] + " folder")
+            
             selectedCategoryNumber = indexPath.row
-            dataManager.reloadLocalFiles(category: indexPath.row)
+            dataManager.selectedCategoryNumber = selectedCategoryNumber
+            dataManager.reloadLocalFiles(category: selectedCategoryNumber)
             
             populateListTable()
             populateFilesCV()
@@ -810,6 +807,8 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
             listTableView.reloadData()
             filesCollectionView.reloadData()
             
+            sendNotification(text: "Reload of " + categories[selectedCategoryNumber] + " folder finished")
+            
         } else {
             print("couldn't find index path")
         }
@@ -817,20 +816,28 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
     }
     
     @objc func icloudFinishedLoading() {
-
+        
         print("icloudFinishedLoading")
 
-        dataManager.compareLocalFilesWithDatabase()
-//        dataManager.compareCDwithIC(type: "Publication")
+        self.sendNotification(text: "Finished reading iCloud records")
 
+        dataManager.compareLocalFilesWithIcloud()
+        
         self.populateListTable()
         self.populateFilesCV()
         self.sortFiles()
-
+        
         self.categoriesCV.reloadData()
         self.listTableView.reloadData()
         self.filesCollectionView.reloadData()
-
+        
+    }
+    
+    @objc func postNotification() {
+        DispatchQueue.main.async {
+            self.view.addSubview(self.progressMonitor)
+            self.progressMonitor.launchMonitor(displayText: nil)
+        }
     }
     
     @objc func reload() {
@@ -845,7 +852,132 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
         
     }
     
+    @objc func sendNotification(text: String) {
+        print("sendNotification")
+        DispatchQueue.main.async {
+            self.view.addSubview(self.progressMonitor)
+            self.progressMonitor.launchMonitor(displayText: text)
+        }
+    }
     
+    @objc func updateView() {
+        print("udateView")
+        self.categoriesCV.reloadData()
+    }
+    
+
+    
+    
+    
+    func addNewItem(title: String?, number: [String?]) {
+        
+        switch categories[selectedCategoryNumber] {
+        case "Publications":
+            if let newTag = title {
+                let newGroup = PublicationGroup(context: context)
+                newGroup.tag = newTag
+                newGroup.dateModified = Date()
+                newGroup.sortNumber = "3"
+                
+                dataManager.publicationGroupsCD.append(newGroup)
+                
+                dataManager.saveCoreData()
+                dataManager.loadCoreData()
+                
+                populateListTable()
+                populateFilesCV()
+                sortFiles()
+                
+                self.listTableView.reloadData()
+                self.filesCollectionView.reloadData()
+            }
+            
+        case "Economy":
+            if let newTitle = title {
+                if let amount = number[0] {
+                    if let currency = number[1] {
+                        let amountReceived = isStringAnInt(stringNumber: amount)
+                        let newProject = Project(context: context)
+                        newProject.name = newTitle
+                        newProject.dateModified = Date()
+                        newProject.dateCreated = Date()
+                        newProject.amountReceived = amountReceived
+                        newProject.currency = currency
+                        
+                        dataManager.saveToIcloud(url: nil, type: "Project", object: newProject)
+                        
+                        dataManager.projectCD.append(newProject)
+                        
+                        dataManager.saveCoreData()
+                        dataManager.loadCoreData()
+                        
+                        amountReceivedString.text = "\(amountReceived)"
+                        amountRemainingString.text = "0"
+                        currencyString.text = currency
+                        
+                        populateListTable()
+                        self.listTableView.reloadData()
+                    }
+                }
+            }
+        default:
+            print("Default 111")
+            
+        }
+    }
+    
+    func alert(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Ok", style: .default, handler: { (action) in
+            alert.dismiss(animated: true, completion: nil)
+        }))
+        self.present(alert, animated: true, completion: nil)
+    }
+    
+    func attemptScrolling(filename: String) {
+        
+        if filename != nil {
+            selectedFile[selectedCategoryNumber].category = categories[selectedCategoryNumber]
+            selectedFile[selectedCategoryNumber].filename = filename
+            selectedFile[selectedCategoryNumber].indexPathCV = []
+            
+            if categories[selectedCategoryNumber] == "Publications" {
+                for section in 0..<filesCV.count {
+                    for row in 0..<filesCV[section].count {
+                        if filesCV[section][row].filename == currentSelectedFilename {
+                            selectedFile[selectedCategoryNumber].indexPathCV.append(IndexPath(row: row, section: section))
+                        }
+                    }
+                }
+            }
+            
+            if !selectedFile[selectedCategoryNumber].indexPathCV.isEmpty {
+                self.filesCollectionView.scrollToItem(at: IndexPath(row: (selectedFile[selectedCategoryNumber].indexPathCV[0]?.row)!, section: (selectedFile[selectedCategoryNumber].indexPathCV[0]?.section)!), at: .top, animated: true)
+                self.listTableView.scrollToRow(at: IndexPath(row: 0, section: (selectedFile[selectedCategoryNumber].indexPathCV[0]?.section)!), at: .top, animated: true)
+                self.listTableView.selectRow(at: IndexPath(row: 0, section: (selectedFile[selectedCategoryNumber].indexPathCV[0]?.section)!), animated: true, scrollPosition: .top)
+            }
+        }
+        
+    }
+    
+    func getArticlesYears() -> [String] {
+        var tmp = [String]()
+        for i in 0..<dataManager.localFiles[selectedCategoryNumber].count {
+            tmp.append("\(dataManager.localFiles[selectedCategoryNumber][i].year!)")
+        }
+        yearsString = tmp.reduce([], {$0.contains($1) ? $0:$0+[$1]})
+        yearsString = yearsString.sorted(by: {$0 < $1})
+        return yearsString
+    }
+    
+    func isStringAnInt(stringNumber: String?) -> Int32 {
+        let number = stringNumber?.replacingOccurrences(of: "\"", with: "")
+        if let tmpValue = Int32(number!) {
+            return tmpValue
+        }
+        print("String number could not be converted")
+        return -2000
+    }
     
     func loadDefaultValues() {
         if let number = kvStorage.object(forKey: "sortCV") as? Int {
@@ -883,89 +1015,8 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
         
     }
     
-    func readDatabases() {
-        publicationsCD = dataManager.publicationsCD
-        publicationGroupsCD = dataManager.publicationGroupsCD
-        authorsCD = dataManager.authorsCD
-        journalsCD = dataManager.journalsCD
-        projectCD = dataManager.projectCD
-        expensesCD = dataManager.expensesCD
-        bookmarksCD = dataManager.bookmarksCD
-        
-        publicationsIC = dataManager.publicationsIC
-        expensesIC = dataManager.expensesIC
-        projectsIC = dataManager.projectsIC
-        bookmarksIC = dataManager.bookmarksIC
-        
-        localFiles = dataManager.localFiles
-        if isSearching {
-            localFiles[selectedCategoryNumber] = dataManager.searchResult
-        }
-    }
-    
-    func addNewItem(title: String?, number: [String?]) {
-        
-        
-        switch categories[selectedCategoryNumber] {
-        case "Publications":
-            if let newTag = title {
-                let newGroup = PublicationGroup(context: context)
-                newGroup.tag = newTag
-                newGroup.dateModified = Date()
-                newGroup.sortNumber = "3"
-                
-                publicationGroupsCD.append(newGroup)
-
-                dataManager.saveCoreData()
-                dataManager.loadCoreData()
-                
-                populateListTable()
-                populateFilesCV()
-                sortFiles()
-                
-                self.listTableView.reloadData()
-                self.filesCollectionView.reloadData()
-            }
-            
-        case "Economy":
-            if let newTitle = title {
-                if let amount = number[0] {
-                    if let currency = number[1] {
-                        let amountReceived = isStringAnInt(stringNumber: amount)
-                        let newProject = Project(context: context)
-                        newProject.name = newTitle
-                        newProject.dateModified = Date()
-                        newProject.dateCreated = Date()
-                        newProject.amountReceived = amountReceived
-                        newProject.currency = currency
-                        
-                        dataManager.saveToIcloud(url: nil, type: "Project", object: newProject)
-                        
-                        projectCD.append(newProject)
-                        
-                        dataManager.saveCoreData()
-                        dataManager.loadCoreData()
-                        
-                        amountReceivedString.text = "\(amountReceived)"
-                        amountRemainingString.text = "0"
-                        currencyString.text = currency
-                        
-                        
-                        populateListTable()
-                        self.listTableView.reloadData()
-                    }
-                }
-            }
-        default:
-            print("Default 111")
-            
-        }
-    }
-    
     func populateListTable() {
-        
-        readDatabases()
-        
+
         sortTableTitles = [String]()
         switch categories[selectedCategoryNumber] {
         case "Publications":
@@ -973,15 +1024,15 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
             //Change to localFiles[0] instead of CD?
             switch sortSubtableStrings[selectedSortingNumber] {
             case "Tag":
-                let tmp = publicationGroupsCD.sorted(by: {($0.sortNumber!, $0.tag!) < ($1.sortNumber!, $1.tag!)})
+                let tmp = dataManager.publicationGroupsCD.sorted(by: {($0.sortNumber!, $0.tag!) < ($1.sortNumber!, $1.tag!)})
                 sortTableTitles = tmp.map { $0.tag! }
             case "Year":
                 sortTableTitles = getArticlesYears()
             case "Author":
-                let tmp = authorsCD.sorted(by: {($0.sortNumber!, $0.name!) < ($1.sortNumber!, $1.name!)})
+                let tmp = dataManager.authorsCD.sorted(by: {($0.sortNumber!, $0.name!) < ($1.sortNumber!, $1.name!)})
                 sortTableTitles = tmp.map { $0.name! }
             case "Journal":
-                let tmp = journalsCD.sorted(by: {($0.sortNumber!, $0.name!) < ($1.sortNumber!, $1.name!)})
+                let tmp = dataManager.journalsCD.sorted(by: {($0.sortNumber!, $0.name!) < ($1.sortNumber!, $1.name!)})
                 sortTableTitles = tmp.map { $0.name! }
             case "Rank":
                 sortTableTitles = ["0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80-89", "90-99", "100"]
@@ -989,14 +1040,14 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                 print("Default 125")
             }
         case "Economy":
-            let tmp = projectCD.sorted(by: {$0.name! < $1.name!})
+            let tmp = dataManager.projectCD.sorted(by: {$0.name! < $1.name!})
             sortTableTitles = tmp.map { $0.name! }
             
         default:
             
             let (number, _) = dataManager.getCategoryNumberAndURL(name: categories[selectedCategoryNumber])
             
-            for file in localFiles[number] {
+            for file in dataManager.localFiles[number] {
                 sortTableTitles.append(file.grandpaFolder!)
             }
             
@@ -1016,10 +1067,17 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
         case "Publications": //LocalFiles[0]
             filesCV = [[]]
             
+            var files: [LocalFile]
+            if dataManager.isSearching && dataManager.searchString.count > 0 {
+                files = dataManager.searchResult
+            } else {
+                files = dataManager.localFiles[selectedCategoryNumber]
+            }
+            
             switch sortSubtableStrings[selectedSortingNumber] {
             case "Tag":
                 for i in 0..<sortTableTitles.count {
-                    for file in localFiles[0] {
+                    for file in files {
                         if file.groups.first(where: {$0 == sortTableTitles[i]}) != nil {
                             filesCV[i].append(file)
                         }
@@ -1031,7 +1089,7 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                 }
             case "Author":
                 for i in 0..<sortTableTitles.count {
-                    for file in localFiles[0] {
+                    for file in files {
                         if file.author == sortTableTitles[i] {
                             filesCV[i].append(file)
                         }
@@ -1043,7 +1101,7 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                 }
             case "Journal":
                 for i in 0..<sortTableTitles.count {
-                    for file in localFiles[0] {
+                    for file in files {
                         if file.journal == sortTableTitles[i] {
                             filesCV[i].append(file)
                         }
@@ -1055,7 +1113,7 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                 }
             case "Year":
                 for i in 0..<sortTableTitles.count {
-                    for file in localFiles[0] {
+                    for file in files {
                         if file.year == Int16(sortTableTitles[i]) {
                             filesCV[i].append(file)
                         }
@@ -1068,7 +1126,7 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
             case "Rank":
                 let rankIntervals = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
                 for i in 0..<rankIntervals.count {
-                    for file in localFiles[0] {
+                    for file in files {
                         if rankIntervals[i] != 100 {
                             if Int16(file.rank!) >= rankIntervals[i] && Int16(file.rank!) < rankIntervals[i+1] {
                                 filesCV[i].append(file)
@@ -1092,11 +1150,14 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
             
             docCV = []
             
-            let number = 1
+            print(selectedCategoryNumber)
+            let (number, _) = dataManager.getCategoryNumberAndURL(name: categories[selectedCategoryNumber])
+            print(number)
+            
             var tmp = DocCV(listTitle: "", sectionHeader: [], files: [[]])
             var folders = [String]()
             
-            for file in localFiles[number] {
+            for file in dataManager.localFiles[number] {
                 folders.append(file.grandpaFolder!)
             }
             
@@ -1108,7 +1169,7 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
             
             for i in 0..<folders.count {
                 tmp.sectionHeader.append(folders[i])
-                for file in localFiles[number] {
+                for file in dataManager.localFiles[number] {
                     if file.grandpaFolder == folders[i] {
                         tmp.files[i].append(file)
                     }
@@ -1129,7 +1190,7 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                 for i in 0..<sortTableTitles.count {
                     var subfolders: [String] = []
                     var tmp = DocCV(listTitle: sortTableTitles[i], sectionHeader: [], files: [[]])
-                    for file in localFiles[number] {
+                    for file in dataManager.localFiles[number] {
                         if file.grandpaFolder == sortTableTitles[i] {
                             tmp.sectionHeader.append(file.parentFolder!)
                         }
@@ -1142,7 +1203,7 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                     }
                     tmp.sectionHeader = subfolders
                     for j in 0..<subfolders.count {
-                        for file in localFiles[number] {
+                        for file in dataManager.localFiles[number] {
                             if file.parentFolder == subfolders[j] && file.grandpaFolder == sortTableTitles[i] {
                                 tmp.files[j].append(file)
                             }
@@ -1158,16 +1219,114 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
         }
     }
     
-    func getArticlesYears() -> [String] {
-        var tmp = [String]()
-        for i in 0..<localFiles[selectedCategoryNumber].count {
-            tmp.append("\(localFiles[selectedCategoryNumber][i].year!)")
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        if (segue.identifier == "segueSortSubtable") {
+            let destination = segue.destination as! SortSubtableViewController
+            destination.sortValue = selectedSortingNumber
+            destination.sortStrings = sortSubtableStrings
+            destination.preferredContentSize = sortTableListBox
         }
-        yearsString = tmp.reduce([], {$0.contains($1) ? $0:$0+[$1]})
-        yearsString = yearsString.sorted(by: {$0 < $1})
-        return yearsString
+        if (segue.identifier == "segueSortCV") {
+            let destination = segue.destination as! SortCVViewController
+            destination.sortValue = selectedSortingCVNumber
+            destination.sortStrings = sortCVStrings
+            destination.preferredContentSize = sortCVBox
+        }
+        if (segue.identifier == "segueSystemInfo") {
+            let destination = segue.destination as! SystemInfoViewController
+            destination.preferredContentSize = systemInfoBox
+        }
+        if (segue.identifier == "segueNotes") {
+            let destination = segue.destination as! NotesViewController
+            destination.localFile = selectedLocalFile
+            destination.dataManager = dataManager
+            destination.preferredContentSize = notesBox
+        }
+        if (segue.identifier == "seguePDFViewController") {
+            let destination = segue.destination as! PDFViewController
+            destination.document = PDFdocument
+            destination.PDFfilename = selectedLocalFile.filename
+            destination.iCloudURL = selectedLocalFile.iCloudURL
+            destination.localURL = selectedLocalFile.localURL
+            destination.progressMonitor = progressMonitor
+            destination.annotationSettings = annotationSettings
+            destination.kvStorage = kvStorage
+            destination.dataManager = dataManager
+            destination.currentFile = selectedLocalFile
+            
+            //DOESNT WORK FOR INVOICES
+//            if categories[selectedCategoryNumber] == "Publications" {
+//                if let currentBookmark = dataManager.bookmarksCD.first(where: {$0.path! == PDFPath!}) {
+//                }
+//            }
+            
+            if let currentBookmark = dataManager.getBookmark(file: selectedLocalFile) {
+                print("Bookmark found")
+                destination.bookmarks = currentBookmark
+            } else {
+                print("No bookmark")
+                let newBookmark = dataManager.newBookmark(file: selectedLocalFile)
+                destination.bookmarks = newBookmark
+            }
+            
+        }
+        if (segue.identifier == "segueSettings") {
+            let destination = segue.destination as! SettingsViewController
+            destination.sync = iCloudSynd
+            destination.scan = scanForFiles
+            destination.dataManager = dataManager
+            destination.preferredContentSize = settingsCollectionViewBox
+        }
+        if (segue.identifier == "segueInvoiceVC") {
+            let destination = segue.destination as! InvoiceViewController
+            destination.invoiceURL = dataManager.economyURL
+        }
+        
     }
+    
+    func setupUI() {
+        
+        print("setupUI")
+        
+        filesDownloading = []
 
+        for _ in 0..<categories.count {
+            let tmp = SelectedFile(category: nil, filename: nil, indexPathCV: [nil])
+            selectedFile.append(tmp)
+        }
+        
+        kvStorage = NSUbiquitousKeyValueStore()
+        loadDefaultValues()
+        
+        //ALWAYS START WITH PUBLICATIONS
+        economyView.isHidden = true
+        filesCollectionView.isHidden = false
+        sortSTButton.isEnabled = true
+        switchView.isEnabled = false
+
+        dataManager.progressMonitor = progressMonitor
+        dataManager.loadCoreData()
+        dataManager.setupDefaultCoreDataTypes()
+        dataManager.compareLocalFilesWithCoreData()
+        dataManager.initIcloudLoad()
+        sendNotification(text: "Starting to load iCloud records")
+        
+        searchBar.isHidden = searchHidden
+
+        self.populateListTable()
+        self.populateFilesCV()
+        self.sortFiles()
+        
+        self.categoriesCV.reloadData()
+        self.listTableView.reloadData()
+        self.filesCollectionView.reloadData()
+        
+        downloadToLocalFileBUtton.isEnabled = false
+        notesButton.isEnabled = false
+        favoriteButton.isEnabled = false
+        
+    }
+    
     func sortFiles() {
         switch categories[selectedCategoryNumber] {
         case "Publications":
@@ -1210,131 +1369,6 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
         }
     }
     
-    func setupUI() {
-        
-        filesDownloading = []
-        
-        for _ in 0..<categories.count {
-            let tmp = SelectedFile(category: nil, filename: nil, indexPathCV: [nil])
-            selectedFile.append(tmp)
-        }
-        
-        
-        kvStorage = NSUbiquitousKeyValueStore()
-        loadDefaultValues()
-        
-        //ALWAYS START WITH PUBLICATIONS
-        economyView.isHidden = true
-        filesCollectionView.isHidden = false
-        sortSTButton.isEnabled = true
-        switchView.isEnabled = false
-
-        dataManager.loadCoreData()
-        dataManager.setupDefaultCoreDataTypes()
-        dataManager.initIcloudLoad()
-        
-        searchBar.isHidden = searchHidden
-
-        self.populateListTable()
-        self.populateFilesCV()
-        self.sortFiles()
-        
-        self.categoriesCV.reloadData()
-        self.listTableView.reloadData()
-        self.filesCollectionView.reloadData()
-        
-        downloadToLocalFileBUtton.isEnabled = false
-        notesButton.isEnabled = false
-        favoriteButton.isEnabled = false
-        
-        print("Finished setupUI")
-        
-    }
-    
-    func isStringAnInt(stringNumber: String?) -> Int32 {
-        let number = stringNumber?.replacingOccurrences(of: "\"", with: "")
-        if let tmpValue = Int32(number!) {
-            return tmpValue
-        }
-        print("String number could not be converted")
-        return -2000
-    }
-
-    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        if (segue.identifier == "segueSortSubtable") {
-            let destination = segue.destination as! SortSubtableViewController
-            destination.sortValue = selectedSortingNumber
-            destination.sortStrings = sortSubtableStrings
-            destination.preferredContentSize = sortTableListBox
-        }
-        if (segue.identifier == "segueSortCV") {
-            let destination = segue.destination as! SortCVViewController
-            destination.sortValue = selectedSortingCVNumber
-            destination.sortStrings = sortCVStrings
-            destination.preferredContentSize = sortCVBox
-        }
-        if (segue.identifier == "segueSystemInfo") {
-            let destination = segue.destination as! SystemInfoViewController
-            destination.preferredContentSize = systemInfoBox
-        }
-        if (segue.identifier == "segueNotes") {
-            let destination = segue.destination as! NotesViewController
-            destination.localFile = selectedLocalFile
-            destination.dataManager = dataManager
-            destination.preferredContentSize = notesBox
-        }
-        if (segue.identifier == "seguePDFViewController") {
-            let destination = segue.destination as! PDFViewController
-            destination.document = PDFdocument
-            destination.PDFfilename = PDFfilename
-            destination.annotationSettings = annotationSettings
-            destination.kvStorage = kvStorage
-            
-            print("Before bookmark")
-            //DOESNT WORK FOR INVOICES
-            if let currentBookmark = bookmarksCD.first(where: {$0.path! == PDFPath!}) {
-                print("Bookmark found")
-                destination.bookmarks = currentBookmark
-            } else {
-                print("No bookmark")
-                let newBookmark = Bookmarks(context: context)
-                newBookmark.path = PDFPath!
-                newBookmark.filename = PDFfilename
-                newBookmark.lastPageVisited = 0
-                newBookmark.category = categories[selectedCategoryNumber]
-                newBookmark.page = []
-                
-                dataManager.saveCoreData()
-                dataManager.loadCoreData()
-                
-                print(newBookmark)
-                
-                destination.bookmarks = newBookmark
-            }
-            
-        }
-        if (segue.identifier == "segueSettings") {
-            let destination = segue.destination as! SettingsViewController
-            destination.sync = iCloudSynd
-            destination.scan = scanForFiles
-            destination.dataManager = dataManager
-            destination.preferredContentSize = settingsCollectionViewBox
-        }
-        if (segue.identifier == "segueInvoiceVC") {
-            let destination = segue.destination as! InvoiceViewController
-            destination.invoiceURL = dataManager.economyURL
-        }
-        
-    }
-    
-    func alert(title: String, message: String) {
-        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Ok", style: .default, handler: { (action) in
-            alert.dismiss(animated: true, completion: nil)
-        }))
-        self.present(alert, animated: true, completion: nil)
-    }
-    
     func updateCurrentSelectedFile(indexPath: IndexPath) {
         
         print("updateCurrentSelectedFile")
@@ -1346,43 +1380,17 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
         print(selectedFile[selectedCategoryNumber])
     }
     
-    func attemptScrolling(filename: String) {
-        
-        if filename != nil {
-            selectedFile[selectedCategoryNumber].category = categories[selectedCategoryNumber]
-            selectedFile[selectedCategoryNumber].filename = filename
-            selectedFile[selectedCategoryNumber].indexPathCV = []
-            
-            if categories[selectedCategoryNumber] == "Publications" {
-                for section in 0..<filesCV.count {
-                    for row in 0..<filesCV[section].count {
-                        if filesCV[section][row].filename == currentSelectedFilename {
-                            selectedFile[selectedCategoryNumber].indexPathCV.append(IndexPath(row: row, section: section))
-                        }
-                    }
-                }
-            }
-            
-            if !selectedFile[selectedCategoryNumber].indexPathCV.isEmpty {
-                self.filesCollectionView.scrollToItem(at: IndexPath(row: (selectedFile[selectedCategoryNumber].indexPathCV[0]?.row)!, section: (selectedFile[selectedCategoryNumber].indexPathCV[0]?.section)!), at: .top, animated: true)
-                self.listTableView.scrollToRow(at: IndexPath(row: 0, section: (selectedFile[selectedCategoryNumber].indexPathCV[0]?.section)!), at: .top, animated: true)
-                self.listTableView.selectRow(at: IndexPath(row: 0, section: (selectedFile[selectedCategoryNumber].indexPathCV[0]?.section)!), animated: true, scrollPosition: .top)
-            }
-        }
-
-    }
-
+    
     
     
     
     // MARK: - Search bar
     func searchBarTextDidBeginEditing(_ searchBar: UISearchBar) {
-        isSearching = true;
+        dataManager.isSearching = true;
     }
 
     func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
-        isSearching = false
-        dataManager.isSearching = isSearching
+        dataManager.isSearching = false
         
         populateListTable()
         populateFilesCV()
@@ -1393,9 +1401,10 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
     }
     
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
-        if isSearching && searchText.count > 0 {
-            dataManager.isSearching = isSearching
+        
+        if !searchBar.isHidden && searchText.count > 0 {
             dataManager.searchString = searchText
+            print(searchText)
             dataManager.searchFiles()
         }
         
@@ -1413,8 +1422,8 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
     // MARK: - Table view
     func numberOfSections(in tableView: UITableView) -> Int {
         if tableView == self.expensesTableView {
-            if selectedSubtableNumber < projectCD.count {
-                return (projectCD[selectedSubtableNumber].expense?.count)!
+            if selectedSubtableNumber < dataManager.projectCD.count {
+                return (dataManager.projectCD[selectedSubtableNumber].expense?.count)!
             } else {
                 return 0
             }
@@ -1464,7 +1473,7 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
         if tableView == self.expensesTableView {
             
             let cell = expensesTableView.dequeueReusableCell(withIdentifier: "economyCell") as! EconomyCell
-            let currentProject = projectCD[selectedSubtableNumber]
+            let currentProject = dataManager.projectCD[selectedSubtableNumber]
             
             if indexPath.section == 0 {
                 currentProject.amountRemaining = currentProject.amountReceived
@@ -1542,7 +1551,7 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                 }
                 
             case "Economy":
-                let currentProject = projectCD[selectedSubtableNumber]
+                let currentProject = dataManager.projectCD[selectedSubtableNumber]
                 currencyString.text = currentProject.currency
                 amountReceivedString.text = "\(currentProject.amountReceived)"
                 amountRemainingString.text = "\(currentProject.amountRemaining)"
@@ -1573,7 +1582,7 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                         let groupName = sortTableTitles[section]
                         if let filename = coordinator.items[0].dragItem.localObject {
                             if let dragedPublication = filesCV[selectedSubtableNumber].first(where: {$0.filename == filename as! String}) {
-                                if let group = publicationGroupsCD.first(where: {$0.tag! == groupName}) {
+                                if let group = dataManager.publicationGroupsCD.first(where: {$0.tag! == groupName}) {
                                     dataManager.addPublicationToGroup(filename: (dragedPublication.filename), group: group)
                                 }
                             }
@@ -1581,14 +1590,14 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                     case "Author":
                         let authorName = sortTableTitles[section]
                         if let filename = coordinator.items[0].dragItem.localObject {
-                            if let dragedPublication = localFiles[0].first(where: {$0.filename == filename as! String}) {
+                            if let dragedPublication = dataManager.localFiles[0].first(where: {$0.filename == filename as! String}) {
                                 dataManager.assignPublicationToAuthor(filename: (dragedPublication.filename), authorName: authorName)
                             }
                         }
                     case "Journal":
                         let journalName = sortTableTitles[section]
                         if let filename = coordinator.items[0].dragItem.localObject {
-                            if let dragedPublication = localFiles[0].first(where: {$0.filename == filename as! String}) {
+                            if let dragedPublication = dataManager.localFiles[0].first(where: {$0.filename == filename as! String}) {
                                 dataManager.assignPublicationToJournal(filename: (dragedPublication.filename), journalName: journalName)
                             }
                         }
@@ -1597,8 +1606,8 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                         if let filename = coordinator.items[0].dragItem.localObject {
                             if let index = dataManager.localFiles[0].index(where: { $0.filename == filename as! String} ) {
                                 dataManager.localFiles[0][index].year = Int16(isStringAnInt(stringNumber: year))
-                                dataManager.updateIcloud(file: localFiles[0][index], oldFilename: nil, newFilename: nil, expense: nil, project: nil, type: "Publications", bookmark: nil)
-                                dataManager.updateCoreData(file: localFiles[0][index], oldFilename: nil, newFilename: nil)
+                                dataManager.updateIcloud(file: dataManager.localFiles[0][index], oldFilename: nil, newFilename: nil, expense: nil, project: nil, type: "Publications", bookmark: nil)
+                                dataManager.updateCoreData(file: dataManager.localFiles[0][index], oldFilename: nil, newFilename: nil)
                             }
                         }
                     default:
@@ -1676,8 +1685,8 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                 case "Publications":
                     if sortSubtableStrings[selectedSortingNumber] == "Tag" {
                         let groupName = sortTableTitles[indexPath.section]
-                        let groupToDelete = publicationGroupsCD.first(where: {$0.tag! == groupName})
-                        context.delete(groupToDelete!)
+                        let groupToDelete = dataManager.publicationGroupsCD.first(where: {$0.tag! == groupName})
+                        dataManager.context.delete(groupToDelete!)
                         
                         dataManager.saveCoreData()
                         dataManager.loadCoreData()
@@ -1690,11 +1699,11 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                         filesCollectionView.reloadData()
                         
                     } else if sortSubtableStrings[selectedSortingNumber] == "Author" {
-                        let noAuthor = authorsCD.first(where: {$0.name == "No author"})
+                        let noAuthor = dataManager.authorsCD.first(where: {$0.name == "No author"})
                         let authorName = sortTableTitles[indexPath.section]
-                        let authorToDelete = authorsCD.first(where: {$0.name! == authorName})
+                        let authorToDelete = dataManager.authorsCD.first(where: {$0.name! == authorName})
                         let articlesBelongingToAuthor = authorToDelete?.publication
-                        context.delete(authorToDelete!)
+                        dataManager.context.delete(authorToDelete!)
                         for item in articlesBelongingToAuthor! {
                             let tmp = item as! Publication
                             tmp.author = noAuthor
@@ -1712,11 +1721,11 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                         
                     } else if sortSubtableStrings[selectedSortingNumber] == "Journal" {
                         
-                        let noJournal = journalsCD.first(where: {$0.name == "No journal"})
+                        let noJournal = dataManager.journalsCD.first(where: {$0.name == "No journal"})
                         let journalName = sortTableTitles[indexPath.section]
-                        let journalsToDelete = journalsCD.first(where: {$0.name == journalName})
+                        let journalsToDelete = dataManager.journalsCD.first(where: {$0.name == journalName})
                         let articlesBelongingToJournal = journalsToDelete?.publication
-                        context.delete(journalsToDelete!)
+                        dataManager.context.delete(journalsToDelete!)
                         for item in articlesBelongingToJournal! {
                             let tmp = item as! Publication
                             tmp.journal = noJournal
@@ -1736,8 +1745,8 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                     
                 case "Economy":
                     let currentProject = sortTableTitles[indexPath.section]
-                    let projectToDelete = projectCD.first(where: {$0.name! == currentProject})
-                    context.delete(projectToDelete!)
+                    let projectToDelete = dataManager.projectCD.first(where: {$0.name! == currentProject})
+                    dataManager.context.delete(projectToDelete!)
                     
                     dataManager.saveCoreData()
                     dataManager.loadCoreData()
@@ -1754,12 +1763,12 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                 
                 
             } else if tableView == self.expensesTableView {
-                let currentProject = projectCD[selectedSubtableNumber]
+                let currentProject = dataManager.projectCD[selectedSubtableNumber]
                 var expenses = currentProject.expense?.allObjects as! [Expense]
                 
                 amountRemainingString.text = "\(currentProject.amountReceived)"
                 
-                let expenseToRemove = expensesCD.first(where: {$0.dateAdded! == expenses[indexPath.section].dateAdded!})
+                let expenseToRemove = dataManager.expensesCD.first(where: {$0.dateAdded! == expenses[indexPath.section].dateAdded!})
                 context.delete(expenseToRemove!)
                 
                 dataManager.saveCoreData()
@@ -1773,7 +1782,7 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
     func tableView(_ tableView: UITableView, leadingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
         
         if tableView == self.expensesTableView {
-            let currentProject = projectCD[selectedSubtableNumber]
+            let currentProject = dataManager.projectCD[selectedSubtableNumber]
             var expenses = currentProject.expense?.allObjects as! [Expense]
             expenses = expenses.sorted(by: {$0.dateAdded! > $1.dateAdded!})
             currentExpense = expenses[indexPath.section]
@@ -1922,7 +1931,6 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
         } else {
             switch categories[selectedCategoryNumber] {
             case "Publications":
-                print(sortTableTitles)
                 return sortTableTitles.count
             case "Economy":
                 return docCV[0].sectionHeader.count
@@ -1943,7 +1951,6 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
         } else {
             switch categories[selectedCategoryNumber] {
             case "Publications":
-                print(filesCV[section].count)
                 return filesCV[section].count
             case "Economy":
                 return docCV[0].files[section].count
@@ -1958,14 +1965,28 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
         if collectionView == self.categoriesCV {
             
             searchBar.isHidden = true
-            isSearching = false
+            dataManager.isSearching = false
             
 //            selectedSubtableNumber = 0 //When jumping between different categories, invalid values might be set to this
 //            currentIndexPath = IndexPath(row: 0, section: 0)
             
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "categoryCell", for: indexPath) as! categoryCell
             let number = categories.index(where: { $0 == categories[indexPath.row] })
-            cell.number.text = "\(localFiles[number!].count)"
+            let itemsSaving = dataManager.localFiles[number!].filter{ $0.saving == true }.count
+            let itemsDownloading = dataManager.localFiles[number!].filter{ $0.downloading == true }.count
+            let itemsDisplay = itemsSaving + itemsDownloading
+            
+            cell.number.text = "\(dataManager.localFiles[number!].count)"
+            cell.saveNumber.text = "\(itemsDisplay)"
+            
+            if itemsDisplay == 0 {
+                cell.saveNumber.isHidden = true
+            } else {
+                if cell.saveNumber.isHidden == true {
+                    cell.saveNumber.isHidden = false
+                    cell.saveNumber.grow()
+                }
+            }
             
             switch categories[indexPath.row] {
                 
@@ -1981,9 +2002,9 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                 cell.icon.image = #imageLiteral(resourceName: "EconomyIcon")
                 cell.icon.highlightedImage = #imageLiteral(resourceName: "EconomyIconSelected")
                 if switchView.isOn {
-                    cell.number.text = "\(projectCD.count)"
+                    cell.number.text = "\(dataManager.projectCD.count)"
                 } else {
-                    cell.number.text = "\(localFiles[number!].count)"
+                    cell.number.text = "\(dataManager.localFiles[number!].count)"
                 }
                 
             case "Manuscripts":
@@ -2114,14 +2135,15 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                 }
 
             case "Economy":
+                let number = 0 //[0] = "publications"
                 
-                cell.label.text = docCV[0].files[indexPath.section][indexPath.row].filename
-                cell.thumbnail.image = docCV[0].files[indexPath.section][indexPath.row].thumbnail
+                cell.label.text = docCV[number].files[indexPath.section][indexPath.row].filename
+                cell.thumbnail.image = docCV[number].files[indexPath.section][indexPath.row].thumbnail
                 cell.favoriteIcon.isHidden = true
                 cell.deleteIcon.isHidden = true
-                cell.sizeLabel.text = docCV[0].files[indexPath.section][indexPath.row].size
+                cell.sizeLabel.text = docCV[number].files[indexPath.section][indexPath.row].size
                 
-                if docCV[0].files[indexPath.section][indexPath.row].downloading && !docCV[0].files[indexPath.section][indexPath.row].available {
+                if docCV[number].files[indexPath.section][indexPath.row].downloading && !docCV[number].files[indexPath.section][indexPath.row].available {
                     if !cell.downloadingIndicator.isAnimating {
                         cell.downloadingIndicator.isHidden = false
                         cell.downloadingIndicator.startAnimating()
@@ -2135,11 +2157,11 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                     }
                 }
 
-                if docCV[0].files[indexPath.section][indexPath.row].downloaded {
+                if docCV[number].files[indexPath.section][indexPath.row].downloaded {
                     cell.fileOffline.isHidden = false
                     cell.fileOffline.image = #imageLiteral(resourceName: "DownloadingPDF.png")
                 } else {
-                    if docCV[0].files[indexPath.section][indexPath.row].available {
+                    if docCV[number].files[indexPath.section][indexPath.row].available {
                         cell.fileOffline.isHidden = true
                     } else {
                         cell.fileOffline.isHidden = false
@@ -2148,7 +2170,7 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                 }
 
                 if cell.label.text == currentSelectedFilename {
-                    selectedLocalFile = docCV[0].files[indexPath.section][indexPath.row]
+                    selectedLocalFile = docCV[number].files[indexPath.section][indexPath.row]
                     cell.layer.borderColor = UIColor.yellow.cgColor
                     cell.layer.borderWidth = 3
 
@@ -2164,6 +2186,7 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                 }
                 
             default:
+                
                 cell.label.text = docCV[selectedSubtableNumber].files[indexPath.section][indexPath.row].filename
                 cell.thumbnail.image = docCV[selectedSubtableNumber].files[indexPath.section][indexPath.row].thumbnail
                 cell.favoriteIcon.isHidden = true
@@ -2359,14 +2382,19 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                     
                     do {
                         try fileManagerDefault.startDownloadingUbiquitousItem(at: fileURL)
-                        let newDownload = DownloadingFile(filename: selectedLocalFile.filename, url: fileURL, downloaded: false, path: filePath)
+                        sendNotification(text: "Downloading " + selectedLocalFile.filename)
+                        
+                        let newDownload = DownloadingFile(filename: selectedLocalFile.filename, url: fileURL, downloaded: false, path: filePath, category: selectedCategoryNumber)
                         filesDownloading.append(newDownload)
                         downloadTimer = Timer.scheduledTimer(timeInterval: 2, target: self, selector: #selector(checkIfFileIsDownloaded), userInfo: nil, repeats: true)
                         selectedLocalFile.downloading = true
                         if categories[selectedCategoryNumber] == "Publications" {
                             filesCV[indexPath.section][indexPath.row].downloading = true //FIX: ONLY IF CATEGORY == PUBLICATIONS
+                        } else {
+                            docCV[selectedSubtableNumber].files[indexPath.section][indexPath.row].downloading = true
                         }
                         dataManager.replaceLocalFileWithNew(newFile: selectedLocalFile)
+                        NotificationCenter.default.post(name: Notification.Name.updateView, object: nil)
                     } catch let error {
                         print(error)
                     }
@@ -2437,8 +2465,8 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
                 sectionHeaderView.subHeaderTitle.text = "\(filesCV[indexPath[0]].count)" + " items"
             }
             
-        case "Economy":
-            sectionHeaderView.mainHeaderTitle.text = docCV[0].sectionHeader[indexPath.section]
+//        case "Economy":
+//            sectionHeaderView.mainHeaderTitle.text = docCV[0].sectionHeader[indexPath.section]
             
         default:
             sectionHeaderView.mainHeaderTitle.text = docCV[selectedSubtableNumber].sectionHeader[indexPath.section]
@@ -2477,6 +2505,7 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
     
     
     override func viewWillAppear(_ animated: Bool) {
+        self.progressMonitor.removeFromSuperview()
         self.navigationController?.isNavigationBarHidden = false
     }
     

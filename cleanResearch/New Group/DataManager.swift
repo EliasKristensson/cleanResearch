@@ -10,6 +10,7 @@ import Foundation
 import UIKit
 import CloudKit
 import CoreData
+import PDFKit
 
 class DataManager {
     
@@ -46,6 +47,7 @@ class DataManager {
     
     var publicationsCD: [Publication] = []
     var authorsCD: [Author] = []
+    var booksCD: [Book] = []
     var journalsCD: [Journal] = []
     var publicationGroupsCD: [PublicationGroup] = []
     var projectCD: [Project] = []
@@ -63,9 +65,12 @@ class DataManager {
     
     var context: NSManagedObjectContext!
 
+    var progressMonitor: ProgressMonitor!
     
     private let fileManagerDefault = FileManager.default
     private let fileHandler = FileHandler()
+    
+    
     
     func addExpense(amount: Int32, OH: Int16, comment: String, reference: String) {
         
@@ -91,62 +96,82 @@ class DataManager {
     }
     
     func addFileToCoreData(file: LocalFile) {
-        print("addFileToCoreData")
+        print("addFileToCoreData: " + file.filename)
         
-        let newPublication = Publication(context: context)
-        
-        newPublication.filename = file.filename
-        newPublication.thumbnail = fileHandler.getThumbnail(icloudURL: publicationsURL.appendingPathComponent(file.filename), localURL: file.localURL, localExist: file.downloaded, pageNumber: 0)
-        newPublication.dateCreated = file.dateCreated
-        newPublication.dateModified = file.dateModified
-        newPublication.year = file.year!
-        newPublication.note = file.note
-        
-        let favoriteGroup = publicationGroupsCD.first(where: {$0.tag == "Favorites"})
-        if file.favorite == "Yes" {
-            newPublication.favorite = "Yes"
-            newPublication.addToPublicationGroup(favoriteGroup!)
-        } else {
-            newPublication.favorite = "No"
-            newPublication.removeFromPublicationGroup(favoriteGroup!)
-        }
-        
-        if authorsCD.first(where: {$0.name == file.author}) == nil {
-            let newAuthor = Author(context: context)
-            newAuthor.name = file.author
-            newAuthor.sortNumber = "1"
-            newPublication.author = newAuthor
-        } else {
-            newPublication.author = authorsCD.first(where: {$0.name == file.author})
-        }
-        
-        if journalsCD.first(where: {$0.name == file.journal}) == nil {
-            let newJournal = Journal(context: context)
-            newJournal.name = file.journal
-            newJournal.sortNumber = "1"
-            newPublication.journal = newJournal
-        } else {
-            newPublication.journal = journalsCD.first(where: {$0.name == file.journal})
-        }
-        
-        for group in file.groups {
-            if let tmp = publicationGroupsCD.first(where: {$0.tag == group}) {
-                newPublication.addToPublicationGroup(tmp)
+        if file.category == "Publications" {
+            
+            let newPublication = Publication(context: context)
+            
+            newPublication.filename = file.filename
+            newPublication.thumbnail = fileHandler.getThumbnail(icloudURL: publicationsURL.appendingPathComponent(file.filename), localURL: file.localURL, localExist: file.downloaded, pageNumber: 0)
+            newPublication.dateCreated = file.dateCreated
+            newPublication.dateModified = file.dateModified
+            newPublication.year = file.year!
+            newPublication.note = file.note
+            
+            let favoriteGroup = publicationGroupsCD.first(where: {$0.tag == "Favorites"})
+            if file.favorite == "Yes" {
+                newPublication.favorite = "Yes"
+                newPublication.addToPublicationGroup(favoriteGroup!)
             } else {
-                let newGroup = PublicationGroup(context: context)
-                newGroup.tag = group
-                newGroup.dateModified = Date()
-                newGroup.sortNumber = "3"
-                newPublication.addToPublicationGroup(newGroup)
+                newPublication.favorite = "No"
+                newPublication.removeFromPublicationGroup(favoriteGroup!)
             }
+            
+            if authorsCD.first(where: {$0.name == file.author}) == nil {
+                let newAuthor = Author(context: context)
+                newAuthor.name = file.author
+                newAuthor.sortNumber = "1"
+                newPublication.author = newAuthor
+            } else {
+                newPublication.author = authorsCD.first(where: {$0.name == file.author})
+            }
+            
+            if journalsCD.first(where: {$0.name == file.journal}) == nil {
+                let newJournal = Journal(context: context)
+                newJournal.name = file.journal
+                newJournal.sortNumber = "1"
+                newPublication.journal = newJournal
+            } else {
+                newPublication.journal = journalsCD.first(where: {$0.name == file.journal})
+            }
+            
+            for group in file.groups {
+                if let tmp = publicationGroupsCD.first(where: {$0.tag == group}) {
+                    newPublication.addToPublicationGroup(tmp)
+                } else {
+                    let newGroup = PublicationGroup(context: context)
+                    newGroup.tag = group
+                    newGroup.dateModified = Date()
+                    newGroup.sortNumber = "3"
+                    newPublication.addToPublicationGroup(newGroup)
+                }
+            }
+            
+            publicationsCD.append(newPublication)
+            
+            saveCoreData()
+            loadCoreData()
+            
+            print("Saved " + newPublication.filename! + " to core data.")
+            
+        } else if file.category == "Books" {
+            
+            let newBook = Book(context: context)
+            
+            newBook.filename = file.filename
+            newBook.dateCreated = file.dateCreated
+            newBook.dateModified = file.dateModified
+            newBook.note = file.note
+            newBook.favorite = file.favorite
+
+            booksCD.append(newBook)
+            
+            saveCoreData()
+            loadCoreData()
+            
+            print("Saved book " + newBook.filename! + " to core data.")
         }
-        
-        publicationsCD.append(newPublication)
-        
-        saveCoreData()
-        
-        print("Saved " + newPublication.filename! + " to core data.")
-        
     }
     
     func addNewItem(title: String?, number: [String?]) {
@@ -244,6 +269,19 @@ class DataManager {
         }
     }
     
+    func addToBookmark(file: LocalFile, bookmark: Bookmarks) {
+        if file.category == "Publications" {
+            if let currentPublication = publicationsCD.first(where: {$0.filename == file.filename}) {
+                currentPublication.bookmarks = bookmark
+            }
+        } else if file.category == "Books" {
+            if let currentBook = booksCD.first(where: {$0.filename == file.filename}) {
+                currentBook.bookmarks = bookmark
+            }
+        }
+        
+    }
+    
     func amountReceivedChanged(amountReceived: Int32) {
         let currentProject = projectCD[selectedSubtableNumber]
         currentProject.amountReceived = amountReceived
@@ -259,6 +297,8 @@ class DataManager {
         // LOCAL FILES
         if let index = localFiles[0].index(where: {$0.filename == filename}) {
             localFiles[0][index].author = authorName
+            localFiles[0][index].dateModified = Date()
+            
             updateIcloud(file: localFiles[0][index], oldFilename: nil, newFilename: nil, expense: nil, project: nil, type: "Publications", bookmark: nil)
             updateCoreData(file: localFiles[0][index], oldFilename: nil, newFilename: nil)
         }
@@ -274,6 +314,7 @@ class DataManager {
             
             if let index = localFiles[0].index(where: {$0.filename == filename}) {
                 localFiles[0][index].journal = journalName
+                localFiles[0][index].dateModified = Date()
                 
                 updateIcloud(file: localFiles[0][index], oldFilename: nil, newFilename: nil, expense: nil, project: nil, type: "Publications", bookmark: nil)
                 updateCoreData(file: localFiles[0][index], oldFilename: nil, newFilename: nil)
@@ -301,15 +342,19 @@ class DataManager {
         print("cleanOutEmptyDatabases")
         
         for item in publicationGroupsCD {
-            let records = publicationGroupsCD.index(where: {$0.tag == item.tag})
+//            let records = publicationGroupsCD.index(where: {$0.tag == item.tag})
             if item.publication?.count == 0 {
                 print(item.tag)
                 context.delete(item)
             }
         }
+        
+        for item in bookmarksCD {
+            context.delete(item)
+        }
 
         for item in authorsCD {
-            let records = authorsCD.index(where: {$0.name == item.name})
+//            let records = authorsCD.index(where: {$0.name == item.name})
             if item.publication?.count == 0 {
                 print(item.name)
                 context.delete(item)
@@ -317,7 +362,7 @@ class DataManager {
         }
         
         for item in journalsCD {
-            let records = journalsCD.index(where: {$0.name == item.name})
+//            let records = journalsCD.index(where: {$0.name == item.name})
             if item.publication?.count == 0 {
                 print(item.name)
                 context.delete(item)
@@ -325,117 +370,132 @@ class DataManager {
 
         }
         saveCoreData()
+        loadCoreData()
     }
 
-    func compareCDwithIC(type: String) {
-        if type == "Publication" {
-            for i in 0..<publicationsLF.count {
-                var icloudFile: PublicationFile?
-                var coreDataFile: Publication?
-                var icloudFound = false
-                var coreDataFound = false
-                
-                //SEARCH ICLOUD
-                if let matchedIcloudFile = publicationsIC.first(where: {$0.filename == publicationsLF[i].filename}) {
-                    icloudFile = matchedIcloudFile
-                    icloudFound = true
+    func compareLocalFilesWithCoreData() {
+        if let number = categories.index(where: { $0 == "Publications" }) {
+            for i in 0..<localFiles[0].count {
+                if let matchedCoreDataFile = publicationsCD.first(where: {$0.filename == localFiles[0][i].filename}) {
+                    updateLocalFilesWithCoreData(index: i, category: number, coreDataFile: matchedCoreDataFile)
                 }
-                
-                //SEARCH COREDATA
-                if let matchedIcloudFile = publicationsCD.first(where: {$0.filename == publicationsLF[i].filename}) {
-                    coreDataFile = matchedIcloudFile
-                    coreDataFound = true
+            }
+        }
+        
+        if let number = categories.index(where: { $0 == "Books" }) {
+            for i in 0..<localFiles[number].count {
+                if let matchedCoreDataFile = booksCD.first(where: {$0.filename == localFiles[0][i].filename}) {
+                    updateLocalFilesWithCoreData(index: i, category: number, coreDataFile: matchedCoreDataFile)
                 }
-                
-                if icloudFound && coreDataFound {
-                    if coreDataFile!.dateModified! > icloudFile!.dateModified! + 30 {
-                        //                        updateLocalFileWithCoreData(index: i, currentFile: coreDataFile!)
-                    } else {
-                        print(icloudFile)
-                        //                        updateLocalFileWithIcloud(index: i, currentFile: icloudFile!)
-                    }
-                } else {
-                    if icloudFound || coreDataFound {
-                        if icloudFound {
-                            //                            updateLocalFileWithIcloud(index: i, currentFile: icloudFile!)
-                        } else {
-                            //                            updateLocalFileWithCoreData(index: i, currentFile: coreDataFile!)
-                        }
-                    } else {
-                        //                        addFileToCoreData(file: localFiles[0][i])
-                    }
-                }
-                
-                
+            }
+        }
+
+    }
+    
+    func compareLocalFilesWithIcloud() {
+        print("compareLocalFilesWithIcloud")
+        for i in 0..<localFiles[0].count {
+            if let matchedIcloudFile = publicationsIC.first(where: {$0.filename == localFiles[0][i].filename}) {
+                print("Updating " + matchedIcloudFile.filename + " using iCloud record")
+                updateLocalFilesWithIcloud(index: i, category: 0, icloudFile: matchedIcloudFile, updateCD: true)
             }
         }
     }
-
+    
     func compareLocalFilesWithDatabase() {
         print("compareLocalFilesWithDatabase")
         
         for i in 0..<localFiles[0].count {
-            
-            var icloudMatch = false
-            var icloudFile: PublicationFile!
-            var coreDataMatch = false
-            var coreDataFile: Publication!
-            
-            //SEARCH ICLOUD
             if let matchedIcloudFile = publicationsIC.first(where: {$0.filename == localFiles[0][i].filename}) {
-                icloudFile = matchedIcloudFile
-                icloudMatch = true
-                print("File: " + localFiles[0][i].filename + " found in iCloud data")
-                print(matchedIcloudFile.dateModified)
-            }
-            
-            //SEARCH COREDATA
-            if let matchedCoreDataFile = publicationsCD.first(where: {$0.filename == localFiles[0][i].filename}) {
-                coreDataFile = matchedCoreDataFile
-                coreDataMatch = true
-                print("File: " + localFiles[0][i].filename + " found in coredata")
-                print(matchedCoreDataFile.dateModified)
+                print("Updating " + matchedIcloudFile.filename + " using iCloud record")
+                updateLocalFilesWithIcloud(index: i, category: 0, icloudFile: matchedIcloudFile, updateCD: true)
+            } else if let matchedCoreDataFile = publicationsCD.first(where: {$0.filename == localFiles[0][i].filename}) {
+                updateLocalFilesWithCoreData(index: i, category: 0, coreDataFile: matchedCoreDataFile)
             } else {
-                print("File: " + localFiles[0][i].filename + " not matched with coredata")
-            }
-            
-            if icloudMatch && coreDataMatch {
-                if coreDataFile.dateModified! > icloudFile.dateModified! + 30 {
-                    print("Use CD")
-                    updateLocalFilesWithCoreData(index: i, category: selectedCategoryNumber, coreDataFile: coreDataFile)
-                    updateIcloud(file: localFiles[0][i], oldFilename: nil, newFilename: nil, expense: nil, project: nil, type: "Publications", bookmark: nil)
-                } else {
-                    print("Use IC")
-                    updateLocalFilesWithIcloud(index: i, category: selectedCategoryNumber, icloudFile: icloudFile)
-                }
-            } else {
-                if icloudMatch || coreDataMatch {
-                    if icloudMatch {
-                        print("Use IC")
-                        updateLocalFilesWithIcloud(index: i, category: selectedCategoryNumber, icloudFile: icloudFile)
-                    } else {
-                        print("Use CD")
-                        updateLocalFilesWithCoreData(index: i, category: selectedCategoryNumber, coreDataFile: coreDataFile)
-                    }
-                } else {
-                    print("Add to CD")
-                    addFileToCoreData(file: localFiles[0][i])
-                }
+                print("File: " + localFiles[0][i].filename + " not found in any databases.")
             }
         }
     }
 
+    func deleteAlliCloudRecords() {
+        print("deleteAlliCloudRecords")
+
+//        let pred = NSPredicate(value: true)
+//        let sort = NSSortDescriptor(key: "creationDate", ascending: false)
+//        let query = CKQuery(recordType: "Publications", predicate: pred)
+//        query.sortDescriptors = [sort]
+//
+//        let operation = CKQueryOperation(query: query)
+////        operation.desiredKeys = ["filename"]
+//        operation.resultsLimit = 50
+//
+//
+//        operation.recordFetchedBlock = { record in
+//            print(record)
+//        }
+//        print("Finished")
+        
+//        var request: CKQuery
+//        request.fetchLimit = 1
+//        request.predicate = NSPredicate(format: "name = %@", txtFieldName.text)
+        
+        
+//        let title = "Berrocal2006.pdf"
+//
+//        let predicate = NSPredicate(format: "self contains %@", title)
+//        let query = CKQuery(recordType: "Publications", predicate: predicate)
+        
+        let query = CKQuery(recordType: "Publications", predicate: NSPredicate(value: true))
+//        query.sortDescriptors = [NSSortDescriptor(key: "modificationDate", ascending: false)]
+        self.privateDatabase.perform(query, inZoneWith: self.recordZone.zoneID) { (records, error) in
+            guard let records = records else {return}
+//            print(records.count)
+            for recond in records {
+                print(recond.object(forKey: "Filename") as! String)
+                self.privateDatabase.delete(withRecordID: recond.recordID) { (recordID, error) -> Void in
+                    guard let recordID = recordID else {
+                        print("Error deleting record: ", error)
+                        return
+                    }
+                    print("Successfully deleted record: ", recordID.recordName)
+                }
+            }
+        }
+    }
+    
     func initIcloudLoad() {
         print("initIcloudLoad")
         
         // GET PUBLICATIONS
         let query = CKQuery(recordType: "Publications", predicate: NSPredicate(value: true))
-        privateDatabase.perform(query, inZoneWith: recordZone.zoneID) { (records, error) in
-            guard let records = records else {return}
+        self.privateDatabase.perform(query, inZoneWith: self.recordZone.zoneID) { (records, error) in
+            
             DispatchQueue.main.async {
+                guard let records = records else {return}
+                print(records.count)
                 for record in records {
-                    let newPublication = PublicationFile(filename: record.object(forKey: "Filename") as! String, title: record.object(forKey: "Title") as? String, year: record.object(forKey: "Year") as? Int16, thumbnails: nil, category: "Publications", rank: record.object(forKey: "Rank") as? Float, note: record.object(forKey: "Note") as? String, dateCreated: record.creationDate, dateModified: record.modificationDate, favorite: record.object(forKey: "Favorite") as? String, author: record.object(forKey: "Author") as? String, journal: record.object(forKey: "Journal") as? String, groups: record.object(forKey: "Group") as! [String?])
-                    self.publicationsIC.append(newPublication)
+                    var load = true
+                    print(record.object(forKey: "Filename") as? String)
+                    if let dateModified = record.object(forKey: "dateModified") as? Date {
+                        let filename = record.object(forKey: "Filename") as! String
+                        
+                        if let matchedCDFile = self.publicationsCD.first(where: {$0.filename == filename}) {
+                            print("Matched CD file: " + matchedCDFile.filename!)
+                            print(matchedCDFile.dateModified!)
+                            
+                            if matchedCDFile.dateModified! > dateModified - 300 {
+                                print("Don't load IC")
+                                load = false
+                            } else {
+                                print("Adding: " + filename)
+                            }
+                        }
+                        
+                        if load {
+                            let newPublication = PublicationFile(filename: record.object(forKey: "Filename") as! String, title: record.object(forKey: "Title") as? String, year: record.object(forKey: "Year") as? Int16, thumbnails: nil, category: "Publications", rank: record.object(forKey: "Rank") as? Float, note: record.object(forKey: "Note") as? String, dateCreated: record.creationDate, dateModified: record.object(forKey: "dateModified") as? Date, favorite: record.object(forKey: "Favorite") as? String, author: record.object(forKey: "Author") as? String, journal: record.object(forKey: "Journal") as? String, groups: record.object(forKey: "Group") as! [String?])
+                            self.publicationsIC.append(newPublication)
+                        }
+                    }
                 }
                 
                 NotificationCenter.default.post(name: Notification.Name.icloudFinished, object: nil)
@@ -528,7 +588,26 @@ class DataManager {
         return (number!, url)
     }
     
+    func getBookmark(file: LocalFile) -> Bookmarks? {
+        if file.category == "Publications" {
+            if let currentPublication = publicationsCD.first(where: {$0.filename == file.filename}) {
+                return currentPublication.bookmarks
+            }
+            
+        } else if file.category == "Books" {
+            if let currentBook = booksCD.first(where: {$0.filename == file.filename}) {
+                return currentBook.bookmarks
+            }
+            
+        } else {
+            
+            return bookmarksCD.first(where: {$0.path! == file.path})
+        }
+        return nil
+    }
+    
     func loadCoreData() {
+        print("loadCoreData")
         
         let requestPublicationGroups: NSFetchRequest<PublicationGroup> = PublicationGroup.fetchRequest()
         requestPublicationGroups.sortDescriptors = [NSSortDescriptor(key: "tag", ascending: true)]
@@ -544,6 +623,14 @@ class DataManager {
             authorsCD = try context.fetch(requestAuthors)
         } catch {
             print("Error loading authors")
+        }
+        
+        let requestBooks: NSFetchRequest<Book> = Book.fetchRequest()
+        requestBooks.sortDescriptors = [NSSortDescriptor(key: "filename", ascending: true)]
+        do {
+            booksCD = try context.fetch(requestBooks)
+        } catch {
+            print("Error loading books")
         }
         
         let requestJournals: NSFetchRequest<Journal> = Journal.fetchRequest()
@@ -588,6 +675,7 @@ class DataManager {
     }
     
     func modifyRecordsOperation(label: String, myRecord: CKRecord) {
+        var ok = true
         let modifyRecordsOperation = CKModifyRecordsOperation(recordsToSave: [myRecord], recordIDsToDelete: nil)
         let configuration = CKOperationConfiguration()
         configuration.timeoutIntervalForRequest = 10
@@ -597,12 +685,44 @@ class DataManager {
         modifyRecordsOperation.modifyRecordsCompletionBlock =
             { records, recordIDs, error in
                 if let err = error {
+                    ok = false
                     print(err)
                 } else {
                     print(label + " record saved successfully to icloud database")
                 }
         }
         self.privateDatabase?.add(modifyRecordsOperation)
+        
+        if ok {
+            self.progressMonitor.text = label + " record saved to icloud"
+        } else {
+            self.progressMonitor.text = label + " record not saved to icloud"
+        }
+        NotificationCenter.default.post(name: Notification.Name.sendNotification, object: self)
+    }
+    
+    func newBookmark(file: LocalFile) -> Bookmarks {
+        let newBookmark = Bookmarks(context: context)
+        newBookmark.path = file.path
+        newBookmark.filename = file.filename
+        newBookmark.lastPageVisited = 0
+        newBookmark.category = file.category
+        newBookmark.page = []
+        
+        if file.category == "Publications" {
+            if let currentPublication = publicationsCD.first(where: {$0.filename == file.filename}) {
+                newBookmark.publication = currentPublication
+            }
+        } else if file.category == "Books" {
+            if let currentBook = booksCD.first(where: {$0.filename == file.filename}) {
+                newBookmark.book = currentBook
+            }
+        }
+        
+        saveCoreData()
+        loadCoreData()
+        
+        return newBookmark
     }
     
     func readAllIcloudDriveFolders() {
@@ -613,30 +733,7 @@ class DataManager {
         for type in categories{
             switch type {
             case "Publications":
-                do {
-                    let fileURLs = try fileManagerDefault.contentsOfDirectory(at: publicationsURL!, includingPropertiesForKeys: nil)
-                    for file in fileURLs {
-                        var available = true
-                        let icloudFileURL = file
-                        let filename = fileHandler.getFilenameFromURL(icloudURL: icloudFileURL)
-                        let path = type + filename
-                        let localFileURL = localURL.appendingPathComponent("Publications").appendingPathComponent(filename)
-                        
-                        let localCopy = fileManagerDefault.fileExists(atPath: localFileURL.path)
-                        
-                        let thumbnail = fileHandler.getThumbnail(icloudURL: icloudFileURL, localURL: localFileURL, localExist: localCopy, pageNumber: 0)
-                        
-                        if icloudFileURL.lastPathComponent.range(of:".icloud") != nil {
-                            available = false
-                        }
-                        
-                        let newFile = LocalFile(label: file.lastPathComponent, thumbnail: thumbnail, favorite: "No", filename: filename, journal: "No journal", year: -2000, category: "Publications", rank: 50, note: "No notes", dateCreated: Date(), dateModified: Date(timeIntervalSince1970: 0), author: "No author", groups: ["All publications"], parentFolder: nil, grandpaFolder: nil, available: available, filetype: nil, iCloudURL: icloudFileURL, localURL: localFileURL, path: path, downloading: false, downloaded: localCopy, uploaded: nil, size: fileHandler.getSize(url: icloudFileURL))
-                        localFiles[0].append(newFile)
-                        
-                    }
-                } catch {
-                    print("Error while enumerating files \(publicationsURL.path): \(error.localizedDescription)")
-                }
+                readPublications()
             default:
                 let (number, url) = getCategoryNumberAndURL(name: type)
                 readFilesInFolder(url: url, type: type, number: number)
@@ -645,16 +742,54 @@ class DataManager {
     }
     
     func readFilesInFolder(url: URL, type: String, number: Int) {
-        print("readFilesInFolder")
+        print("readFilesInFolder: " + categories[number])
         
         do {
             let folderURLs = try fileManagerDefault.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
             localFiles.append([])
             for folder in folderURLs {
-                if folder.isDirectory()! {
+                if !folder.isDirectory()! {
+                    //FILES DIRECTLY IN MAIN FOLDER
+                    var available = true
+                    let icloudFileURL = folder
+                    let filename = fileHandler.getFilenameFromURL(icloudURL: icloudFileURL)
+                    let path = type + filename
+                    let localFileURL = localURL.appendingPathComponent(type).appendingPathComponent(folder.lastPathComponent).appendingPathComponent(filename)
+                    let localCopy = fileManagerDefault.fileExists(atPath: localFileURL.path)
+                    
+                    let thumbnail = fileHandler.getThumbnail(icloudURL: icloudFileURL, localURL: localFileURL, localExist: localCopy, pageNumber: 0)
+                    
+                    if icloudFileURL.lastPathComponent.range(of:".icloud") != nil {
+                        available = false
+                    }
+                    
+                    let newFile = LocalFile(label: filename, thumbnail: thumbnail, favorite: "No", filename: filename, journal: nil, year: nil, category: type, rank: nil, note: "No notes", dateCreated: Date(timeIntervalSince1970: 0), dateModified: Date(timeIntervalSince1970: 0), author: nil, groups: [nil], parentFolder: "Uncategorized", grandpaFolder: "Uncategorized", available: available, filetype: nil, iCloudURL: icloudFileURL, localURL: localFileURL, path: path, downloading: false, downloaded: localCopy, uploaded: nil, size: fileHandler.getSize(url: icloudFileURL), saving: false)
+                    localFiles[number].append(newFile)
+                    
+                } else {
+                    //FILES IN A SUB OR SUBSUBFOLDER
                     let subfoldersURLs = try fileManagerDefault.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
                     for subfolder in subfoldersURLs {
-                        if subfolder.isDirectory()! {
+                        if !subfolder.isDirectory()! {
+                            //FILES IN A SUBFOLDER
+                            var available = true
+                            let icloudFileURL = subfolder
+                            let filename = fileHandler.getFilenameFromURL(icloudURL: icloudFileURL)
+                            let path = type + folder.lastPathComponent + filename
+                            let localFileURL = localURL.appendingPathComponent(type).appendingPathComponent(folder.lastPathComponent).appendingPathComponent(filename)
+                            let localCopy = fileManagerDefault.fileExists(atPath: localFileURL.path)
+                            
+                            let thumbnail = fileHandler.getThumbnail(icloudURL: icloudFileURL, localURL: localFileURL, localExist: localCopy, pageNumber: 0)
+                            
+                            if icloudFileURL.lastPathComponent.range(of:".icloud") != nil {
+                                available = false
+                            }
+                            
+                            let newFile = LocalFile(label: filename, thumbnail: thumbnail, favorite: "No", filename: filename, journal: nil, year: nil, category: type, rank: nil, note: "No notes", dateCreated: Date(timeIntervalSince1970: 0), dateModified: Date(timeIntervalSince1970: 0), author: nil, groups: [nil], parentFolder: "Uncategorized", grandpaFolder: folder.lastPathComponent, available: available, filetype: nil, iCloudURL: icloudFileURL, localURL: localFileURL, path: path, downloading: false, downloaded: localCopy, uploaded: nil, size: fileHandler.getSize(url: icloudFileURL), saving: false)
+                            localFiles[number].append(newFile)
+                            
+                        } else {
+                            //FILES IN A SUBSUBFOLDER
                             let files = try fileManagerDefault.contentsOfDirectory(at: subfolder, includingPropertiesForKeys: nil)
                             for file in files {
                                 var available = true
@@ -673,53 +808,43 @@ class DataManager {
                                     available = false
                                 }
                                 
-                                let newFile = LocalFile(label: filename, thumbnail: thumbnail, favorite: "No", filename: filename, journal: nil, year: nil, category: type, rank: nil, note: "No notes", dateCreated: Date(timeIntervalSince1970: 0), dateModified: Date(timeIntervalSince1970: 0), author: nil, groups: [nil], parentFolder: subfolder.lastPathComponent, grandpaFolder: folder.lastPathComponent, available: available, filetype: nil, iCloudURL: icloudFileURL, localURL: localFileURL, path: path, downloading: false, downloaded: localCopy, uploaded: nil, size: fileHandler.getSize(url: icloudFileURL))
+                                let newFile = LocalFile(label: filename, thumbnail: thumbnail, favorite: "No", filename: filename, journal: nil, year: nil, category: type, rank: nil, note: "No notes", dateCreated: Date(timeIntervalSince1970: 0), dateModified: Date(timeIntervalSince1970: 0), author: nil, groups: [nil], parentFolder: subfolder.lastPathComponent, grandpaFolder: folder.lastPathComponent, available: available, filetype: nil, iCloudURL: icloudFileURL, localURL: localFileURL, path: path, downloading: false, downloaded: localCopy, uploaded: nil, size: fileHandler.getSize(url: icloudFileURL), saving: false)
                                 localFiles[number].append(newFile)
-                                
                             }
-                        } else {
-                            var available = true
-                            let icloudFileURL = subfolder
-                            let filename = fileHandler.getFilenameFromURL(icloudURL: icloudFileURL)
-                            let path = type + folder.lastPathComponent + filename
-                            let localFileURL = localURL.appendingPathComponent(type).appendingPathComponent(folder.lastPathComponent).appendingPathComponent(filename)
-                            let localCopy = fileManagerDefault.fileExists(atPath: localFileURL.path)
-                            
-                            let thumbnail = fileHandler.getThumbnail(icloudURL: icloudFileURL, localURL: localFileURL, localExist: localCopy, pageNumber: 0)
-                            
-                            if icloudFileURL.lastPathComponent.range(of:".icloud") != nil {
-                                available = false
-                            }
-                            
-                            let newFile = LocalFile(label: filename, thumbnail: thumbnail, favorite: "No", filename: filename, journal: nil, year: nil, category: type, rank: nil, note: "No notes", dateCreated: Date(timeIntervalSince1970: 0), dateModified: Date(timeIntervalSince1970: 0), author: nil, groups: [nil], parentFolder: "Uncategorized", grandpaFolder: folder.lastPathComponent, available: available, filetype: nil, iCloudURL: icloudFileURL, localURL: localFileURL, path: path, downloading: false, downloaded: localCopy, uploaded: nil, size: fileHandler.getSize(url: icloudFileURL))
-                            localFiles[number].append(newFile)
-                            
                         }
                     }
-                } else {
-                    var available = true
-                    let icloudFileURL = folder
-                    let filename = fileHandler.getFilenameFromURL(icloudURL: icloudFileURL)
-                    let path = type + folder.lastPathComponent + filename
-                    let localFileURL = localURL.appendingPathComponent(type).appendingPathComponent(folder.lastPathComponent).appendingPathComponent(filename)
-                    let localCopy = fileManagerDefault.fileExists(atPath: localFileURL.path)
-                    
-                    let thumbnail = fileHandler.getThumbnail(icloudURL: icloudFileURL, localURL: localFileURL, localExist: localCopy, pageNumber: 0)
-                    
-                    if icloudFileURL.lastPathComponent.range(of:".icloud") != nil {
-                        available = false
-                    }
-                    
-                    let newFile = LocalFile(label: filename, thumbnail: thumbnail, favorite: "No", filename: filename, journal: nil, year: nil, category: type, rank: nil, note: "No notes", dateCreated: Date(timeIntervalSince1970: 0), dateModified: Date(timeIntervalSince1970: 0), author: nil, groups: [nil], parentFolder: "Uncategorized", grandpaFolder: "Uncategorized", available: available, filetype: nil, iCloudURL: icloudFileURL, localURL: localFileURL, path: path, downloading: false, downloaded: localCopy, uploaded: nil, size: fileHandler.getSize(url: icloudFileURL))
-                    localFiles[number].append(newFile) //OUT OF RANGE
-                    
                 }
-                
             }
         } catch {
             print("Error while reading " + type + " folders")
         }
-        
+    }
+    
+    func readPublications() {
+        do {
+            let fileURLs = try fileManagerDefault.contentsOfDirectory(at: publicationsURL!, includingPropertiesForKeys: nil)
+            for file in fileURLs {
+                var available = true
+                let icloudFileURL = file
+                let filename = fileHandler.getFilenameFromURL(icloudURL: icloudFileURL)
+                let path = "Publications" + filename
+                let localFileURL = localURL.appendingPathComponent("Publications").appendingPathComponent(filename)
+                
+                let localCopy = fileManagerDefault.fileExists(atPath: localFileURL.path)
+                
+                let thumbnail = fileHandler.getThumbnail(icloudURL: icloudFileURL, localURL: localFileURL, localExist: localCopy, pageNumber: 0)
+                
+                if icloudFileURL.lastPathComponent.range(of:".icloud") != nil {
+                    available = false
+                }
+                
+                let newFile = LocalFile(label: file.lastPathComponent, thumbnail: thumbnail, favorite: "No", filename: filename, journal: "No journal", year: -2000, category: "Publications", rank: 50, note: "No notes", dateCreated: Date(), dateModified: Date(timeIntervalSince1970: 0), author: "No author", groups: ["All publications"], parentFolder: nil, grandpaFolder: nil, available: available, filetype: nil, iCloudURL: icloudFileURL, localURL: localFileURL, path: path, downloading: false, downloaded: localCopy, uploaded: nil, size: fileHandler.getSize(url: icloudFileURL), saving: false)
+                localFiles[0].append(newFile)
+                
+            }
+        } catch {
+            print("Error while enumerating files \(publicationsURL.path): \(error.localizedDescription)")
+        }
     }
     
     func reloadLocalFiles(category: Int) {
@@ -728,33 +853,8 @@ class DataManager {
         localFiles[category] = []
         switch categories[category] {
         case "Publications":
-            do {
-                let fileURLs = try fileManagerDefault.contentsOfDirectory(at: publicationsURL!, includingPropertiesForKeys: nil)
-                for file in fileURLs {
-                    var available = true
-                    let icloudFileURL = file
-                    let filename = fileHandler.getFilenameFromURL(icloudURL: icloudFileURL)
-                    let path = "Publications" + filename
-                    let localFileURL = localURL.appendingPathComponent("Publications").appendingPathComponent(filename)
-                    
-                    let localCopy = fileManagerDefault.fileExists(atPath: localFileURL.path)
-                    
-                    let thumbnail = fileHandler.getThumbnail(icloudURL: icloudFileURL, localURL: localFileURL, localExist: localCopy, pageNumber: 0)
-                    
-                    if icloudFileURL.lastPathComponent.range(of:".icloud") != nil {
-                        available = false
-                    }
-                    
-                    let newFile = LocalFile(label: file.lastPathComponent, thumbnail: thumbnail, favorite: "No", filename: filename, journal: "No journal", year: -2000, category: "Publications", rank: 50, note: "No notes", dateCreated: Date(timeIntervalSince1970: 0), dateModified: Date(timeIntervalSince1970: 0), author: "No author", groups: ["All publications"], parentFolder: nil, grandpaFolder: nil, available: available, filetype: nil, iCloudURL: icloudFileURL, localURL: localFileURL, path: path, downloading: false, downloaded: localCopy, uploaded: nil, size: fileHandler.getSize(url: icloudFileURL))
-                    localFiles[0].append(newFile)
-                    
-                }
-                compareLocalFilesWithDatabase()
-                
-            } catch {
-                print("Error while enumerating files \(publicationsURL.path): \(error.localizedDescription)")
-                
-            }
+            readPublications()
+            compareLocalFilesWithDatabase()
             
         default:
             let (number, url) = getCategoryNumberAndURL(name: categories[category])
@@ -798,6 +898,54 @@ class DataManager {
         }
     }
 
+    func saveBookmark(file: LocalFile, bookmark: Bookmarks) {
+        print("saveBookmarks")
+        
+        if let currentBookmark = getBookmark(file: file) {
+            currentBookmark.lastPageVisited = bookmark.lastPageVisited
+            currentBookmark.page = bookmark.page
+            saveCoreData()
+            loadCoreData()
+            updateIcloud(file: nil, oldFilename: nil, newFilename: nil, expense: nil, project: nil, type: "Bookmarks", bookmark: bookmark)
+        } else {
+            saveToIcloud(url: nil, type: "Bookmarks", object: bookmark)
+        }
+    }
+    
+    func savePDF(file: LocalFile, document: PDFDocument) {
+        print("savePDF: " + file.filename)
+
+        let number = categories.index(where: { $0 == file.category })
+        let index = localFiles[number!].index(where: {$0.filename == file.filename})
+        
+        localFiles[number!][index!].saving = true
+        
+        sendNotification(text: "Autosaving " + file.filename)
+        NotificationCenter.default.post(name: Notification.Name.updateView, object: nil)
+        
+        let dispatchQueue = DispatchQueue(label: "QueueIdentification", qos: .background)
+        dispatchQueue.async{
+            if !document.write(to: file.iCloudURL) {
+                print("Failed to save PDF to iCloud drive")
+            } else {
+                print("Saved " + file.filename + " to iCloud drive")
+                self.sendNotification(text: "Saved " + file.filename + " to iCloud")
+            }
+            if self.localFiles[number!][index!].downloaded {
+                if !document.write(to: file.localURL) {
+                    print("Failed to save PDF to local folder")
+                } else {
+                    print("Saved " + file.filename + " locally")
+                    self.sendNotification(text: "Saved " + file.filename + " locally")
+                }
+            }
+            self.localFiles[number!][index!].saving = false
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: Notification.Name.updateView, object: nil)
+            }
+        }
+    }
+    
     func saveToIcloud(url: URL?, type: String, object: Any?) {
         print("saveToIcloud")
         
@@ -806,84 +954,56 @@ class DataManager {
                 
                 if type == "Publications" {
                     
+                    if object != nil {
+                        let publication = object as! Publication
+                    }
+                    
                     let myRecord = CKRecord(recordType: "Publications", zoneID: zoneID)
-                    let thumbnail = CKAsset(fileURL: url!)
                     myRecord.setObject(url?.lastPathComponent as CKRecordValue?, forKey: "Filename")
                     myRecord.setObject("No author" as CKRecordValue?, forKey: "Author")
-                    myRecord.setObject(thumbnail as CKRecordValue?, forKey: "Thumbnail")
                     myRecord.setObject(["All publications"] as CKRecordValue?, forKey: "Group")
                     myRecord.setObject(50 as CKRecordValue?, forKey: "Rank")
                     myRecord.setObject(-2000 as CKRecordValue?, forKey: "Year")
                     myRecord.setObject("No notes" as CKRecordValue?, forKey: "Note")
                     myRecord.setObject("No" as CKRecordValue?, forKey: "Favorite")
+                    myRecord.setObject(Date() as CKRecordValue?, forKey: "dateModified")
                     
                     self.modifyRecordsOperation(label: "Publication", myRecord: myRecord)
-//
-//                    let modifyRecordsOperation = CKModifyRecordsOperation(recordsToSave: [myRecord], recordIDsToDelete: nil)
-//                    let configuration = CKOperationConfiguration()
-//                    configuration.timeoutIntervalForRequest = 10
-//                    configuration.timeoutIntervalForResource = 10
-//
-//                    modifyRecordsOperation.configuration = configuration
-//                    modifyRecordsOperation.modifyRecordsCompletionBlock =
-//                        { records, recordIDs, error in
-//                            if let err = error {
-//                                print(err)
-//                            } else {
-//                                print("Publication saved successfully to icloud database")
-//                            }
-//                    }
-//                    self.privateDatabase?.add(modifyRecordsOperation)
             
-            } else if type == "Expense" {
-            
-                let myRecord = CKRecord(recordType: "Expenses", zoneID: zoneID)
-                let expense = object as! Expense
-                myRecord.setObject(expense.amount as CKRecordValue?, forKey: "Amount")
-                myRecord.setObject(expense.dateAdded as CKRecordValue?, forKey: "createdAt")
-                myRecord.setObject(expense.overhead as CKRecordValue?, forKey: "Overhead")
-                myRecord.setObject(expense.comment as CKRecordValue?, forKey: "Comment")
-                myRecord.setObject(expense.reference as CKRecordValue?, forKey: "Reference")
-                myRecord.setObject(expense.idNumber as CKRecordValue?, forKey: "idNumber")
-                
-                if let tmp = expense.project {
-                    myRecord.setObject(tmp.name as CKRecordValue?, forKey: "BelongToProject")
-                }
-                if expense.active {
-                    myRecord.setObject("Yes" as CKRecordValue?, forKey: "Active")
-                } else {
-                    myRecord.setObject("No" as CKRecordValue?, forKey: "Active")
-                }
+                } else if type == "Expense" {
                     
-                self.modifyRecordsOperation(label: "Expense", myRecord: myRecord)
+                    let myRecord = CKRecord(recordType: "Expenses", zoneID: zoneID)
+                    let expense = object as! Expense
+                    myRecord.setObject(expense.amount as CKRecordValue?, forKey: "Amount")
+                    myRecord.setObject(expense.dateAdded as CKRecordValue?, forKey: "createdAt")
+                    myRecord.setObject(expense.overhead as CKRecordValue?, forKey: "Overhead")
+                    myRecord.setObject(expense.comment as CKRecordValue?, forKey: "Comment")
+                    myRecord.setObject(expense.reference as CKRecordValue?, forKey: "Reference")
+                    myRecord.setObject(expense.idNumber as CKRecordValue?, forKey: "idNumber")
                     
-            } else if type == "Projects" {
-                
-                let myRecord = CKRecord(recordType: "Projects", zoneID: zoneID)
-                let project = object as! Project
-                myRecord.setObject(project.amountReceived as CKRecordValue?, forKey: "AmountReceived")
-                myRecord.setObject(project.amountRemaining as CKRecordValue?, forKey: "AmountRemaining")
-                myRecord.setObject(project.name as CKRecordValue?, forKey: "Name")
-                myRecord.setObject(project.dateCreated as CKRecordValue?, forKey: "createdAt")
-                
+                    if let tmp = expense.project {
+                        myRecord.setObject(tmp.name as CKRecordValue?, forKey: "BelongToProject")
+                    }
+                    if expense.active {
+                        myRecord.setObject("Yes" as CKRecordValue?, forKey: "Active")
+                    } else {
+                        myRecord.setObject("No" as CKRecordValue?, forKey: "Active")
+                    }
+                    
+                    self.modifyRecordsOperation(label: "Expense", myRecord: myRecord)
+                    
+                } else if type == "Projects" {
+                    
+                    let myRecord = CKRecord(recordType: "Projects", zoneID: zoneID)
+                    let project = object as! Project
+                    myRecord.setObject(project.amountReceived as CKRecordValue?, forKey: "AmountReceived")
+                    myRecord.setObject(project.amountRemaining as CKRecordValue?, forKey: "AmountRemaining")
+                    myRecord.setObject(project.name as CKRecordValue?, forKey: "Name")
+                    myRecord.setObject(project.dateCreated as CKRecordValue?, forKey: "createdAt")
+                    
                     self.modifyRecordsOperation(label: "Project", myRecord: myRecord)
-//                let modifyRecordsOperation = CKModifyRecordsOperation(recordsToSave: [myRecord], recordIDsToDelete: nil)
-//                let configuration = CKOperationConfiguration()
-//                configuration.timeoutIntervalForRequest = 10
-//                configuration.timeoutIntervalForResource = 10
-//
-//                modifyRecordsOperation.configuration = configuration
-//                modifyRecordsOperation.modifyRecordsCompletionBlock =
-//                    { records, recordIDs, error in
-//                        if let err = error {
-//                            print(err)
-//                        } else {
-//                            print("Economy record saved successfully to icloud database")
-//                        }
-//                }
-//                self.privateDatabase?.add(modifyRecordsOperation)
                     
-            } else if type == "Bookmarks" {
+                } else if type == "Bookmarks" {
                     
                     let myRecord = CKRecord(recordType: "Bookmarks", zoneID: zoneID)
                     let bookmark = object as! Bookmarks
@@ -896,21 +1016,6 @@ class DataManager {
                     
                     self.modifyRecordsOperation(label: "Bookmarks", myRecord: myRecord)
                     
-//                    let modifyRecordsOperation = CKModifyRecordsOperation(recordsToSave: [myRecord], recordIDsToDelete: nil)
-//                    let configuration = CKOperationConfiguration()
-//                    configuration.timeoutIntervalForRequest = 10
-//                    configuration.timeoutIntervalForResource = 10
-//
-//                    modifyRecordsOperation.configuration = configuration
-//                    modifyRecordsOperation.modifyRecordsCompletionBlock =
-//                        { records, recordIDs, error in
-//                            if let err = error {
-//                                print(err)
-//                            } else {
-//                                print("Bookmark record saved successfully to icloud database")
-//                            }
-//                    }
-//                    self.privateDatabase?.add(modifyRecordsOperation)
                 }
             }
         }
@@ -1013,6 +1118,12 @@ class DataManager {
         }
     }
     
+    func sendNotification(text: String) {
+        DispatchQueue.main.async {
+            self.progressMonitor.launchMonitor(displayText: text)
+        }
+    }
+    
     func setupDefaultCoreDataTypes() {
         
         // ADD "NO AUTHOR"
@@ -1053,65 +1164,85 @@ class DataManager {
     }
     
     func updateCoreData(file: LocalFile, oldFilename: String?, newFilename: String?) {
+        print("updateCoreData")
         
-        var filename = file.filename
-        if oldFilename != nil {
-            filename = oldFilename!
-        }
-        
-        if let currentPublication = publicationsCD.first(where: {$0.filename == filename}) {
-            
+        if file.category == "Publications" {
+            var filename = file.filename
             if oldFilename != nil {
-                currentPublication.filename = newFilename!
-            } else {
-                currentPublication.filename = filename
+                filename = oldFilename!
             }
             
-            currentPublication.dateModified = Date()
-            currentPublication.rank = file.rank!
-            currentPublication.year = file.year!
-            currentPublication.note = file.note
-            
-            if authorsCD.first(where: {$0.name == file.author}) == nil {
-                let newAuthor = Author(context: context)
-                newAuthor.name = file.author
-                newAuthor.sortNumber = "1"
-                print("Added new author: " + newAuthor.name!)
-                currentPublication.author = newAuthor
-            } else {
-                currentPublication.author = authorsCD.first(where: {$0.name == file.author})
-            }
-            
-            if journalsCD.first(where: {$0.name == file.journal}) == nil {
-                let newJournal = Journal(context: context)
-                newJournal.name = file.journal
-                newJournal.sortNumber = "1"
-                print("Added new journal: " + newJournal.name!)
-                currentPublication.journal = newJournal
-            } else {
-                currentPublication.journal = journalsCD.first(where: {$0.name == file.journal})
-                print("Added to journal: " + (currentPublication.journal?.name)!)
-            }
-            
-            for group in file.groups {
-                if let tmp = publicationGroupsCD.first(where: {$0.tag == group}) {
-                    currentPublication.addToPublicationGroup(tmp) //Assume (for now) that all groups can be found in publicationGroupsCD
+            if let currentPublication = publicationsCD.first(where: {$0.filename == filename}) {
+                
+                if oldFilename != nil {
+                    currentPublication.filename = newFilename!
                 } else {
-                    let newGroup = PublicationGroup(context: context)
-                    newGroup.tag = group
-                    newGroup.sortNumber = "3"
-                    newGroup.dateModified = Date()
-                    print("Added new group: " + newGroup.tag!)
-                    currentPublication.addToPublicationGroup(newGroup)
+                    currentPublication.filename = filename
                 }
+                
+                currentPublication.dateModified = file.dateModified
+                currentPublication.rank = file.rank!
+                currentPublication.year = file.year!
+                currentPublication.note = file.note
+                
+                if authorsCD.first(where: {$0.name == file.author}) == nil {
+                    let newAuthor = Author(context: context)
+                    newAuthor.name = file.author
+                    newAuthor.sortNumber = "1"
+                    print("Added new author: " + newAuthor.name!)
+                    currentPublication.author = newAuthor
+                } else {
+                    currentPublication.author = authorsCD.first(where: {$0.name == file.author})
+                }
+                
+                if journalsCD.first(where: {$0.name == file.journal}) == nil {
+                    let newJournal = Journal(context: context)
+                    newJournal.name = file.journal
+                    newJournal.sortNumber = "1"
+                    print("Added new journal: " + newJournal.name!)
+                    currentPublication.journal = newJournal
+                } else {
+                    currentPublication.journal = journalsCD.first(where: {$0.name == file.journal})
+                    print("Added to journal: " + (currentPublication.journal?.name)!)
+                }
+                
+                for group in file.groups {
+                    if let tmp = publicationGroupsCD.first(where: {$0.tag == group}) {
+                        currentPublication.addToPublicationGroup(tmp) //Assume (for now) that all groups can be found in publicationGroupsCD
+                    } else {
+                        let newGroup = PublicationGroup(context: context)
+                        newGroup.tag = group
+                        newGroup.sortNumber = "3"
+                        newGroup.dateModified = Date()
+                        print("Added new group: " + newGroup.tag!)
+                        currentPublication.addToPublicationGroup(newGroup)
+                    }
+                }
+                
+                saveCoreData()
+                loadCoreData()
+                
+            } else {
+                // A FILE FOUND IN FOLDER BUT NOT SAVED INTO CORE DATA
+                addFileToCoreData(file: file)
             }
             
-            saveCoreData()
-            loadCoreData()
+        } else if file.category == "Books" {
             
-        } else {
-            // A FILE FOUND IN FOLDER BUT NOT SAVED INTO CORE DATA
-            addFileToCoreData(file: file)
+            if let currentBook = booksCD.first(where: {$0.filename == file.filename}) {
+                
+                currentBook.dateModified = file.dateModified
+                currentBook.rank = file.rank!
+                currentBook.note = file.note
+                currentBook.favorite = file.favorite
+                
+                saveCoreData()
+                loadCoreData()
+                
+            } else {
+                // A FILE FOUND IN FOLDER BUT NOT SAVED INTO CORE DATA
+                addFileToCoreData(file: file)
+            }
         }
     }
     
@@ -1119,22 +1250,24 @@ class DataManager {
     
         print("updateIcloud")
         
+        var updated = true
+    
         if type == "Publications" {
-            var filename = file!.filename
-            if oldFilename != nil {
-                filename = oldFilename!
-            }
-            
-            let predicate = NSPredicate(format: "Filename = %@", filename)
-            let query = CKQuery(recordType: type, predicate: predicate)
-            
-            privateDatabase?.perform(query, inZoneWith: recordZone?.zoneID) { (records, error) in
-                guard let records = records else {return}
-                DispatchQueue.main.async {
+            DispatchQueue.main.async {
+                var filename = file!.filename
+                if oldFilename != nil {
+                    filename = oldFilename!
+                }
+                
+                let predicate = NSPredicate(format: "Filename = %@", filename)
+                let query = CKQuery(recordType: type, predicate: predicate)
+                
+                self.privateDatabase?.perform(query, inZoneWith: self.recordZone?.zoneID) { (records, error) in
+                    guard let records = records else {return}
                     // FOUND AT LEAST ONE RECORD
                     if records.count > 0 {
                         for record in records {
-                            print(record.object(forKey: "Filename") as! String)
+                            print(record.object(forKey: "Filename") as! String + " found in iCloud records")
                             if record.object(forKey: "Filename") as! String == filename {
                                 
                                 if oldFilename != nil {
@@ -1148,24 +1281,40 @@ class DataManager {
                                 record.setObject(file!.author as CKRecordValue?, forKey: "Author")
                                 record.setObject(file!.journal as CKRecordValue?, forKey: "Journal")
                                 record.setObject(file!.groups as CKRecordValue?, forKey: "Group")
+                                record.setObject(file!.dateModified as CKRecordValue?, forKey: "dateModified")
                                 
                                 self.privateDatabase?.save(record, completionHandler:( { savedRecord, error in
-                                    DispatchQueue.main.async {
-                                        if let error = error {
-                                            print("accountStatus error: \(error)")
-                                        }
-                                        print(file!.filename + " successfully updated to icloud database")
+                                    if let error = error {
+                                        print("accountStatus error: \(error)")
                                     }
-                                }))
-                                
+                                    print(file!.filename + " successfully updated to icloud database")
+                                } ))
                             }
                         }
                     } else {
-                        self.saveToIcloud(url: file?.iCloudURL, type: "Publications", object: file)
+                        if let zoneID = self.recordZone?.zoneID {
+                            let myRecord = CKRecord(recordType: "Publications", zoneID: zoneID)
+                            myRecord.setObject(file!.filename as CKRecordValue?, forKey: "Filename")
+                            myRecord.setObject(file!.author as CKRecordValue?, forKey: "Author")
+                            myRecord.setObject(file!.groups as CKRecordValue?, forKey: "Group")
+                            myRecord.setObject(file!.rank as CKRecordValue?, forKey: "Rank")
+                            myRecord.setObject(file!.year as CKRecordValue?, forKey: "Year")
+                            myRecord.setObject(file!.note as CKRecordValue?, forKey: "Note")
+                            myRecord.setObject(file!.favorite as CKRecordValue?, forKey: "Favorite")
+                            myRecord.setObject(file!.dateModified as CKRecordValue?, forKey: "dateModified")
+                            
+                            self.modifyRecordsOperation(label: "Publication", myRecord: myRecord)
+                        }
                     }
                 }
+                if updated {
+                    self.progressMonitor.text = filename + " updated to icloud"
+                    NotificationCenter.default.post(name: Notification.Name.sendNotification, object: self)
+                }
             }
+            
         } else if type == "Expenses" {
+            
             let predicate = NSPredicate(format: "Filename = %@", expense!.idNumber)
             let query = CKQuery(recordType: type, predicate: predicate)
             
@@ -1252,8 +1401,9 @@ class DataManager {
     
     func updateLocalFilesWithCoreData(index: Int, category: Int, coreDataFile: Any) {
         //FIX: If "publications" isn't loaded first, the files are not correctly read.
-        switch category {
-        case 0:
+        
+        switch categories[category] {
+        case "Publications":
             let currentCoreDataFile = coreDataFile as! Publication
             localFiles[category][index].year = currentCoreDataFile.year
             localFiles[category][index].rank = currentCoreDataFile.rank
@@ -1287,14 +1437,24 @@ class DataManager {
                 }
             }
             
+        case "Books":
+            let currentCoreDataFile = coreDataFile as! Book
+            localFiles[category][index].rank = currentCoreDataFile.rank
+            localFiles[category][index].note = currentCoreDataFile.note!
+            localFiles[category][index].dateCreated = currentCoreDataFile.dateCreated!
+            localFiles[category][index].dateModified = currentCoreDataFile.dateModified!
+            localFiles[category][index].favorite = currentCoreDataFile.favorite!
+            
         default:
             print("Default 130")
         }
     }
 
-    func updateLocalFilesWithIcloud(index: Int, category: Int, icloudFile: Any) {
-        switch category {
-        case 0:
+    func updateLocalFilesWithIcloud(index: Int, category: Int, icloudFile: Any, updateCD: Bool) {
+        print("updateLocalFilesWithIcloud")
+        
+        if categories[category] == "Publications" {
+            
             let currentIcloudFile = icloudFile as! PublicationFile
             localFiles[category][index].year = currentIcloudFile.year
             localFiles[category][index].rank = currentIcloudFile.rank
@@ -1317,7 +1477,6 @@ class DataManager {
                 localFiles[category][index].author = "No author"
             }
             
-            
             if currentIcloudFile.journal != nil {
                 localFiles[category][index].journal = currentIcloudFile.journal!
                 if journalsCD.first(where: {$0.name == currentIcloudFile.journal}) == nil {
@@ -1335,157 +1494,16 @@ class DataManager {
             localFiles[category][index].groups = currentIcloudFile.groups
             print("Icloud file: " + localFiles[category][index].filename)
             
-            //Update Core data with just updated localFiles
-            updateCoreData(file: localFiles[category][index], oldFilename: nil, newFilename: nil)
-            
-        default:
-            print("Default 131")
+            if updateCD {
+                //Update Core data with just updated localFiles
+                updateCoreData(file: localFiles[category][index], oldFilename: nil, newFilename: nil)
+            }
+        } else if categories[category] == "Books" {
+            print("Books")
         }
     }
     
     
     
 }
-
-
-/*
-func updateDatabasesWithNewFileInformation(currentFile: LocalFile) {
-    if categories[selectedCategoryNumber] == "Publications" {
-        print("Updating databases")
-        
-        // UPDATING CORE DATA
-        updateCoreData(file: currentFile, oldFilename: nil, newFilename: nil)
-        
-        // UPDATING ICLOUD
-        updateIcloud(file: currentFile, oldFilename: nil, newFilename: nil, type: "Publications")
-        
-        
-        
-    }
-}
-
-     func updateLocalFileWithIcloud(index: Int, currentFile: PublicationFile) {
-         localFiles[0][index].year = currentFile.year
-         localFiles[0][index].rank = currentFile.rank
-         localFiles[0][index].note = currentFile.note!
-         localFiles[0][index].dateCreated = currentFile.dateCreated!
-         localFiles[0][index].dateModified = currentFile.dateModified!
-         localFiles[0][index].favorite = currentFile.favorite!
- 
-         if currentFile.author != nil {
-             localFiles[0][index].author = currentFile.author!
-             //            if authorsCD.first(where: {$0.name == currentFile.author}) == nil {
-             //                let newAuthor = Author(context: context)
-             //                newAuthor.name = currentFile.author
-             //                newAuthor.sortNumber = "1"
-             //                print("Added new author: " + newAuthor.name!)
-             //                saveCoreData()
-             //                loadCoreData()
-             //            }
-         } else {
-             localFiles[0][index].author = "No author"
-         }
- 
- 
-         if currentFile.journal != nil {
-             localFiles[0][index].journal = currentFile.journal!
-             //            if journalsCD.first(where: {$0.name == currentFile.journal}) == nil {
-             //                let newJournal = Journal(context: context)
-             //                newJournal.name = currentFile.journal
-             //                newJournal.sortNumber = "1"
-             //                print("Added new journal: " + newJournal.name!)
-             //                saveCoreData()
-             //                loadCoreData()
-             //            }
-         } else {
-             localFiles[0][index].journal = "No journal"
-         }
- 
-         localFiles[0][index].groups = currentFile.groups
-         print("Icloud file: " + localFiles[0][index].filename)
- 
-         //Update Core data with just updated localFiles
-         //        updateCoreData(file: localFiles[category][index], oldFilename: nil, newFilename: nil)
- 
-     }
- 
- 
- func updateLocalFileWithCoreData(index: Int, currentFile: Publication) {
- 
- localFiles[0][index].year = currentFile.year
- localFiles[0][index].rank = currentFile.rank
- localFiles[0][index].note = currentFile.note!
- localFiles[0][index].dateCreated = currentFile.dateCreated!
- localFiles[0][index].dateModified = currentFile.dateModified!
- 
- if localFiles[0][index].thumbnail == #imageLiteral(resourceName: "fileIcon.png") {
- if let thumbnail = currentFile.thumbnail as? UIImage {
- localFiles[0][index].thumbnail = thumbnail
- }
- }
- 
- if let author = currentFile.author?.name {
- localFiles[0][index].author = author
- } else {
- localFiles[0][index].author = "No author"
- }
- 
- if let journal = currentFile.journal?.name {
- localFiles[0][index].journal = journal
- } else {
- localFiles[0][index].journal = "No journal"
- }
- 
- localFiles[0][index].favorite = "No"
- for group in currentFile.publicationGroup?.allObjects as! [PublicationGroup] {
- localFiles[0][index].groups.append(group.tag)
- if group.tag == "Favorites" {
- localFiles[0][index].favorite = "Yes"
- }
- }
- }
- 
- // ADD FILE TO ICLOUD
- //                        if let zoneID = self.recordZone?.zoneID {
- //                            let myRecord = CKRecord(recordType: type, zoneID: zoneID)
- //                            switch type {
- //                            case "Publications":
- //
- //                                if oldFilename != nil {
- //                                    myRecord.setObject(newFilename! as CKRecordValue?, forKey: "Filename")
- //                                } else {
- //                                    myRecord.setObject(filename as CKRecordValue?, forKey: "Filename")
- //                                }
- //
- //                                myRecord.setObject(file!.author as CKRecordValue?, forKey: "Author")
- //                                myRecord.setObject(file!.journal as CKRecordValue?, forKey: "Journal")
- //                                myRecord.setObject(file!.groups as CKRecordValue?, forKey: "Group")
- //                                myRecord.setObject(Int(file!.rank!) as CKRecordValue?, forKey: "Rank")
- //                                myRecord.setObject(file!.year as CKRecordValue?, forKey: "Year")
- //                                myRecord.setObject(file!.note as CKRecordValue?, forKey: "Note")
- //                                myRecord.setObject(file!.favorite as CKRecordValue?, forKey: "Favorite")
- //
- //                                let modifyRecordsOperation = CKModifyRecordsOperation(recordsToSave: [myRecord], recordIDsToDelete: nil)
- //                                let configuration = CKOperationConfiguration()
- //                                configuration.timeoutIntervalForRequest = 10
- //                                configuration.timeoutIntervalForResource = 10
- //
- //                                modifyRecordsOperation.configuration = configuration
- //                                modifyRecordsOperation.modifyRecordsCompletionBlock =
- //                                    { records, recordIDs, error in
- //                                        if let err = error {
- //                                            print(err)
- //                                        } else {
- //                                            DispatchQueue.main.async {
- //                                                print(file!.filename + " successfully added to icloud database")
- //                                            }
- //                                        }
- //                                }
- //                                self.privateDatabase?.add(modifyRecordsOperation)
- //                            default:
- //                                print("101")
- //                            }
- //                        }
- 
- */
 

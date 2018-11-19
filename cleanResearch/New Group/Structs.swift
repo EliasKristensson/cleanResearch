@@ -48,6 +48,7 @@ struct LocalFile {
     var downloaded: Bool
     var uploaded: Date?
     var size: String
+    var saving: Bool
 }
 
 struct PublicationFile {
@@ -89,6 +90,7 @@ struct DownloadingFile {
     var url: URL
     var downloaded: Bool
     var path: String
+    var category: Int
 }
 
 struct SelectedFile {
