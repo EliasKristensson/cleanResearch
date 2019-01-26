@@ -33,18 +33,23 @@ class LoadingViewController: UIViewController {
     var meetingsURL: URL!
     var conferenceURL: URL!
     var reviewsURL: URL!
+    var workDocsURL: URL!
+    var hiringURL: URL!
+    var travelURL: URL!
     var miscellaneousURL: URL!
     var patentsURL: URL!
     var docsURL: URL!
-    var iCloudURL: URL! //IS THIS NEEDED?
+    var notesURL: URL!
+//    var iCloudURL: URL! //IS THIS NEEDED?
     var localURL: URL!
     
-    let categories: [String] = ["Publications", "Books", "Economy", "Manuscripts", "Presentations", "Proposals", "Supervision", "Teaching", "Patents", "Courses", "Meetings", "Conferences", "Reviews", "Miscellaneous"]
+    let categories: [String] = ["Recently", "Publications", "Books", "Economy", "Manuscripts", "Presentations", "Proposals", "Supervision", "Teaching", "Patents", "Courses", "Meetings", "Conferences", "Reviews", "Work documents", "Travel", "Notes", "Miscellaneous"]
 
     let fileHandler = FileHandler()
     var dataManager = DataManager()
     
     var localFiles: [[LocalFile]] = [[]]
+    var orderedCategories: [Categories] = []
     
     var progressMonitor = ProgressMonitor()
     let progressMonitorSettings: [CGFloat] = [40, 300, 0.6, 0.8] //Height, Width, grayness, alpha
@@ -61,7 +66,7 @@ class LoadingViewController: UIViewController {
         icloudAvailable = appDelegate.iCloudAvailable!
         context = appDelegate.context
         
-        self.iCloudURL = self.appDelegate.iCloudURL
+//        self.iCloudURL = self.appDelegate.iCloudURL
         self.docsURL = self.appDelegate.docURL
         self.localURL = self.appDelegate.localURL
         self.publicationsURL = self.appDelegate.publicationURL
@@ -77,6 +82,10 @@ class LoadingViewController: UIViewController {
         self.meetingsURL = self.appDelegate.meetingsURL
         self.conferenceURL = self.appDelegate.conferencesURL
         self.reviewsURL = self.appDelegate.reviewsURL
+        self.workDocsURL = self.appDelegate.workDocsURL
+        self.hiringURL = self.appDelegate.hiringURL
+        self.travelURL = self.appDelegate.travelURL
+        self.notesURL = self.appDelegate.notesURL
         self.miscellaneousURL = self.appDelegate.miscellaneousURL
         
         privateDatabase = container().privateCloudDatabase
@@ -99,7 +108,6 @@ class LoadingViewController: UIViewController {
         dataManager.privateDatabase = privateDatabase
         setupProgressMonitor()
         
-//        dataManager.icloudURL = iCloudURL //iCloudURL
         dataManager.docsURL = docsURL
         dataManager.localURL = localURL
         dataManager.categories = categories
@@ -117,15 +125,23 @@ class LoadingViewController: UIViewController {
         dataManager.meetingsURL = meetingsURL
         dataManager.conferencesURL = conferenceURL
         dataManager.reviewsURL = reviewsURL
+        dataManager.workDocsURL = workDocsURL
+        dataManager.hiringURL = hiringURL
+        dataManager.travelURL = travelURL 
         dataManager.miscellaneousURL = miscellaneousURL
+        dataManager.notesURL = notesURL
         dataManager.categories = categories
 
+        dataManager.loadCoreData()
+        dataManager.setupDefaultCoreDataTypes()
+        
         if icloudAvailable {
             sendNotification(text: "Reading iCloud drive folders")
             dataManager.readAllIcloudDriveFolders()
-            dataManager.loadCoreData()
 //            dataManager.cleanOutEmptyDatabases()
         }
+        
+        orderedCategories = dataManager.categoriesCD.sorted(by: {($0.numberViews, Int16.max - $0.originalOrder) > ($1.numberViews, Int16.max - $1.originalOrder)})
         
         if !icloudAvailable! {
             alert(title: "iCloud Drive not available", message: "Log into your iCloud account and add iCloud Drive services")
@@ -137,22 +153,48 @@ class LoadingViewController: UIViewController {
     }
     
     
+    
+    
     func sendNotification(text: String) {
-        
-        self.view.addSubview(progressMonitor)
-        self.view.bringSubview(toFront: progressMonitor)
-        progressMonitor.launchMonitor(displayText: text)
-        
+        DispatchQueue.main.async {
+            self.progressMonitor.launchMonitor(displayText: text)
+        }
     }
     
     func setupProgressMonitor() {
-        progressMonitor.frame = CGRect(x: self.view.bounds.maxX/2 - progressMonitorSettings[1]/2, y: self.view.bounds.size.height+progressMonitorSettings[0], width: progressMonitorSettings[1], height: progressMonitorSettings[0])
+        print("setupProgressMonitor")
+        
+        if UIDevice.current.orientation.isLandscape {
+            print("Landscape")
+            if self.view.bounds.maxX < self.view.bounds.maxY { //Works
+                print("L1")
+                progressMonitor.frame = CGRect(x: self.view.bounds.maxY/2 - progressMonitorSettings[1]/2, y: self.view.bounds.size.height+progressMonitorSettings[0], width: progressMonitorSettings[1], height: progressMonitorSettings[0])
+                progressMonitor.iPadDimension = [self.view.bounds.maxX, self.view.bounds.maxY] // [y,x]
+            } else { //Normal
+                print("L2")
+                progressMonitor.frame = CGRect(x: self.view.bounds.maxX/2 - progressMonitorSettings[1]/2, y: self.view.bounds.size.width+progressMonitorSettings[0], width: progressMonitorSettings[1], height: progressMonitorSettings[0])
+                progressMonitor.iPadDimension = [self.view.bounds.maxY, self.view.bounds.maxX]
+            }
+        } else {
+            print("Portrait")
+            if self.view.bounds.maxX < self.view.bounds.maxY { //Normal, doesn't work
+                print("P1")
+                progressMonitor.frame = CGRect(x: self.view.bounds.maxX/2 - progressMonitorSettings[1]/2, y: self.view.bounds.size.height+progressMonitorSettings[0], width: progressMonitorSettings[1], height: progressMonitorSettings[0])
+                progressMonitor.iPadDimension = [self.view.bounds.maxY, self.view.bounds.maxX]
+            } else { //Works
+                print("P2")
+                progressMonitor.frame = CGRect(x: self.view.bounds.maxY/2 - progressMonitorSettings[1]/2, y: self.view.bounds.size.width+progressMonitorSettings[0], width: progressMonitorSettings[1], height: progressMonitorSettings[0])
+                progressMonitor.iPadDimension = [self.view.bounds.maxX, self.view.bounds.maxY]
+            }
+        }
+        
         progressMonitor.settings = progressMonitorSettings
         progressMonitor.backgroundColor = UIColor(displayP3Red: progressMonitorSettings[2], green: progressMonitorSettings[2], blue: progressMonitorSettings[2], alpha: progressMonitorSettings[3])
         progressMonitor.layer.cornerRadius = 12
         progressMonitor.layer.borderWidth = 1
         progressMonitor.layer.borderColor = UIColor(red:255/255, green:255/255, blue:255/255, alpha: progressMonitorSettings[3]).cgColor
-        progressMonitor.iPadDimension = [self.view.bounds.maxY, self.view.bounds.maxX]
+        self.view.addSubview(self.progressMonitor)
+        self.view.bringSubview(toFront: progressMonitor)
     }
     
     func alert(title: String, message: String) {
@@ -165,11 +207,14 @@ class LoadingViewController: UIViewController {
     }
     
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        print("prepare for segue to main VC")
+        
         let destination = segue.destination as! ViewController
         destination.dataManager = dataManager
         destination.categories = categories
         destination.progressMonitor = progressMonitor
-//        destination.progressMonitorSettings = progressMonitorSettings
+        destination.orderedCategories = orderedCategories
+        destination.progressMonitorSettings = progressMonitorSettings
     }
     
     override func didReceiveMemoryWarning() {
@@ -177,248 +222,12 @@ class LoadingViewController: UIViewController {
         // Dispose of any resources that can be recreated.
     }
     
-
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
+        return .all
+    }
+    
+    override var shouldAutorotate: Bool {
+        return true
+    }
 }
 
-
-
-
-
-//    func readFilesInFolders(url: URL, type: String, number: Int) {
-//        do {
-//            let folderURLs = try fileManagerDefault.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
-//            localFiles.append([])
-//            for folder in folderURLs {
-//                if folder.isDirectory()! {
-//                    let subfoldersURLs = try fileManagerDefault.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
-//                    for subfolder in subfoldersURLs {
-//                        if subfolder.isDirectory()! {
-//                            let files = try fileManagerDefault.contentsOfDirectory(at: subfolder, includingPropertiesForKeys: nil)
-//                            for file in files {
-//                                var available = true
-//                                let icloudFileURL = file
-//                                let filename = handleFilename(icloudURL: icloudFileURL)
-//
-//
-//
-//                                let path = type + folder.lastPathComponent + subfolder.lastPathComponent + filename
-//                                let localFileURL = docsURL.appendingPathComponent(type).appendingPathComponent(folder.lastPathComponent).appendingPathComponent(subfolder.lastPathComponent).appendingPathComponent(filename)
-//
-//                                let localCopy = fileManagerDefault.fileExists(atPath: localFileURL.path)
-//
-//                                let thumbnail = handleThumbnail(icloudURL: icloudFileURL, localURL: localFileURL, localExist: localCopy)
-//
-//                                if icloudFileURL.lastPathComponent.range(of:".icloud") != nil {
-//                                    available = false
-//                                }
-//
-//                                let newFile = LocalFile(label: filename, thumbnail: thumbnail, favorite: "No", filename: filename, journal: nil, year: nil, category: type, rank: nil, note: "No notes", dateCreated: Date(), dateModified: Date(), author: nil, groups: [nil], parentFolder: subfolder.lastPathComponent, grandpaFolder: folder.lastPathComponent, available: available, filetype: nil, iCloudURL: icloudFileURL, localURL: localFileURL, path: path, downloading: false, downloaded: localCopy, uploaded: nil, size: getSize(url: icloudFileURL))
-//                                localFiles[number].append(newFile)
-//
-//                            }
-//                        } else {
-//                            var available = true
-//                            let icloudFileURL = subfolder
-//                            let filename = handleFilename(icloudURL: icloudFileURL)
-//                            let path = type + folder.lastPathComponent + filename
-//                            let localFileURL = docsURL.appendingPathComponent(type).appendingPathComponent(folder.lastPathComponent).appendingPathComponent(filename)
-//                            let localCopy = fileManagerDefault.fileExists(atPath: localFileURL.path)
-//
-//                            let thumbnail = handleThumbnail(icloudURL: icloudFileURL, localURL: localFileURL, localExist: localCopy)
-//
-//                            if icloudFileURL.lastPathComponent.range(of:".icloud") != nil {
-//                                available = false
-//                            }
-//
-//                            let newFile = LocalFile(label: filename, thumbnail: thumbnail, favorite: "No", filename: filename, journal: nil, year: nil, category: type, rank: nil, note: "No notes", dateCreated: Date(), dateModified: Date(), author: nil, groups: [nil], parentFolder: "Uncategorized", grandpaFolder: folder.lastPathComponent, available: available, filetype: nil, iCloudURL: icloudFileURL, localURL: localFileURL, path: path, downloading: false, downloaded: localCopy, uploaded: nil, size: getSize(url: icloudFileURL))
-//                            localFiles[number].append(newFile)
-//
-//                        }
-//                    }
-//                } else {
-//                    var available = true
-//                    let icloudFileURL = folder
-//                    let filename = handleFilename(icloudURL: icloudFileURL)
-//                    let path = type + folder.lastPathComponent + filename
-//                    let localFileURL = docsURL.appendingPathComponent(type).appendingPathComponent(folder.lastPathComponent).appendingPathComponent(filename)
-//                    let localCopy = fileManagerDefault.fileExists(atPath: localFileURL.path)
-//
-//                    let thumbnail = handleThumbnail(icloudURL: icloudFileURL, localURL: localFileURL, localExist: localCopy)
-//
-//                    if icloudFileURL.lastPathComponent.range(of:".icloud") != nil {
-//                        available = false
-//                    }
-//
-//                    let newFile = LocalFile(label: filename, thumbnail: thumbnail, favorite: "No", filename: filename, journal: nil, year: nil, category: type, rank: nil, note: "No notes", dateCreated: Date(), dateModified: Date(), author: nil, groups: [nil], parentFolder: "Uncategorized", grandpaFolder: folder.lastPathComponent, available: available, filetype: nil, iCloudURL: icloudFileURL, localURL: localFileURL, path: path, downloading: false, downloaded: localCopy, uploaded: nil, size: getSize(url: icloudFileURL))
-//                    localFiles[number].append(newFile)
-//
-//                }
-//
-//            }
-//        } catch {
-//            print("Error while reading " + type + " folders")
-//        }
-//
-//    }
-//
-//    func readIcloudDriveFolders() {
-//        localFiles = [[]]
-//
-//        for type in categories{
-//            switch type {
-//            case "Publications":
-//                do {
-//                    let fileURLs = try fileManagerDefault.contentsOfDirectory(at: publicationsURL!, includingPropertiesForKeys: nil)
-//                    for file in fileURLs {
-//                        var available = true
-//                        let icloudFileURL = file
-//                        let filename = handleFilename(icloudURL: icloudFileURL)
-//                        let path = type + filename
-//                        let localFileURL = docsURL.appendingPathComponent("Publications").appendingPathComponent(filename)
-//
-//                        let localCopy = fileManagerDefault.fileExists(atPath: localFileURL.path)
-//
-//                        let thumbnail = handleThumbnail(icloudURL: icloudFileURL, localURL: localFileURL, localExist: localCopy)
-//
-//                        if icloudFileURL.lastPathComponent.range(of:".icloud") != nil {
-//                            available = false
-//                        }
-//
-//                        let newFile = LocalFile(label: file.lastPathComponent, thumbnail: thumbnail, favorite: "No", filename: filename, journal: "No journal", year: -2000, category: "Publications", rank: 50, note: "No notes", dateCreated: Date(), dateModified: Date(), author: "No author", groups: ["All publications"], parentFolder: nil, grandpaFolder: nil, available: available, filetype: nil, iCloudURL: icloudFileURL, localURL: localFileURL, path: path, downloading: false, downloaded: localCopy, uploaded: nil, size: getSize(url: icloudFileURL))
-//                        localFiles[0].append(newFile)
-//                    }
-//                } catch {
-//                    print("Error while enumerating files \(publicationsURL.path): \(error.localizedDescription)")
-//                }
-//            case "Economy":
-//                readFilesInFolders(url: economyURL, type: type, number: 1)
-//            case "Manuscripts":
-//                readFilesInFolders(url: manuscriptsURL, type: type, number: 2)
-//            case "Presentations":
-//                readFilesInFolders(url: presentationsURL, type: type, number: 3)
-//            case "Proposals":
-//                readFilesInFolders(url: proposalsURL, type: type, number: 4)
-//            case "Supervision":
-//                readFilesInFolders(url: supervisionsURL, type: type, number: 5)
-//            case "Teaching":
-//                readFilesInFolders(url: teachingURL, type: type, number: 6)
-//            case "Patents":
-//                readFilesInFolders(url: patentsURL, type: type, number: 7)
-//            case "Courses":
-//                readFilesInFolders(url: coursesURL, type: type, number: 8)
-//            case "Meetings":
-//                readFilesInFolders(url: meetingsURL, type: type, number: 9)
-//            case "Reviews":
-//                readFilesInFolders(url: reviewsURL, type: type, number: 10)
-//            case "Miscellaneous":
-//                readFilesInFolders(url: miscellaneousURL, type: type, number: 11)
-//            default:
-//                print("Default 122")
-//            }
-//        }
-//    }
-//
-//    func handleFilename(icloudURL: URL) -> String {
-//        var filename = String()
-//        if icloudURL.lastPathComponent.range(of:".icloud") != nil {
-//            filename = icloudURL.deletingPathExtension().lastPathComponent
-//            filename.remove(at: filename.startIndex)
-//        } else {
-//            filename = icloudURL.lastPathComponent
-//        }
-//        return filename
-//    }
-//
-//    func handleThumbnail(icloudURL: URL, localURL: URL, localExist: Bool) -> UIImage {
-//        var thumbnail = UIImage()
-//
-//        //        if icloudURL.lastPathComponent.range(of:".icloud") != nil {
-//        //            thumbnail = getThumbnail(url: icloudURL, pageNumber: 0)
-//        //        } else {
-//        //            thumbnail = getThumbnail(url: icloudURL, pageNumber: 0)
-//        //        }
-//
-//        thumbnail = getThumbnail(url: icloudURL, pageNumber: 0)
-//        if localExist {
-//            thumbnail = getThumbnail(url: localURL, pageNumber: 0)
-//        }
-//        return thumbnail
-//    }
-//
-//    func getThumbnail(url: URL, pageNumber: Int) -> UIImage {
-//        var pageThumbnail = #imageLiteral(resourceName: "FileOffline")
-//        if url.lastPathComponent.range(of:".jpg") != nil {
-//            pageThumbnail = #imageLiteral(resourceName: "JpgIcon")
-//            if url.lastPathComponent.range(of:".icloud") == nil {
-//                if let data = try? Data(contentsOf: url) {
-//                    pageThumbnail = UIImage(data: data)!
-//                }
-//            }
-//
-//        } else if url.lastPathComponent.range(of:".pdf") != nil {
-//            if let document = PDFDocument(url: url) {
-//                let page: PDFPage!
-//                page = document.page(at: pageNumber)!
-//                pageThumbnail = page.thumbnail(of: CGSize(width: 210, height: 297), for: .artBox)
-//            }
-//        } else if url.lastPathComponent.range(of:".tiff") != nil {
-//            pageThumbnail = #imageLiteral(resourceName: "TIFF")
-//            if url.lastPathComponent.range(of:".icloud") == nil {
-//                if let data = try? Data(contentsOf: url) {
-//                    pageThumbnail = UIImage(data: data)!
-//                }
-//            }
-//        } else if url.lastPathComponent.range(of:".png") != nil {
-//            pageThumbnail = #imageLiteral(resourceName: "PNG")
-//            if url.lastPathComponent.range(of:".icloud") == nil {
-//                if let data = try? Data(contentsOf: url) {
-//                    pageThumbnail = UIImage(data: data)!
-//                }
-//            }
-//        } else if url.lastPathComponent.range(of:".m") != nil {
-//            pageThumbnail = #imageLiteral(resourceName: "M")
-//        } else if url.lastPathComponent.range(of:".ai") != nil {
-//            pageThumbnail = #imageLiteral(resourceName: "AI")
-//        } else if url.lastPathComponent.range(of:".eps") != nil {
-//            pageThumbnail = #imageLiteral(resourceName: "EPS")
-//        } else if url.lastPathComponent.range(of:".pptx") != nil || url.lastPathComponent.range(of:".ppt") != nil {
-//            pageThumbnail = #imageLiteral(resourceName: "PowerpointIcon")
-//        } else if url.lastPathComponent.range(of:".docx") != nil || url.lastPathComponent.range(of:".doc") != nil {
-//            pageThumbnail = #imageLiteral(resourceName: "WordIcon")
-//        } else if url.lastPathComponent.range(of:".xlsx") != nil || url.lastPathComponent.range(of:".xlsm") != nil {
-//            pageThumbnail = #imageLiteral(resourceName: "ExcelIcon")
-//        } else if url.lastPathComponent.range(of:".key") != nil {
-//            pageThumbnail = #imageLiteral(resourceName: "KeynoteIcon")
-//        } else if url.lastPathComponent.range(of:".txt") != nil {
-//            pageThumbnail = #imageLiteral(resourceName: "TXT")
-//        }
-//        return pageThumbnail
-//    }
-//
-//    func getSize(url: URL) -> String {
-//        var fileSize: UInt64 = 0
-//        var sizeString: String = "134 kb"
-//
-//        do {
-//            let attr = try fileManagerDefault.attributesOfItem(atPath: url.path)
-//            fileSize = attr[FileAttributeKey.size] as! UInt64
-//
-//        } catch {
-//            print("Error: \(error)")
-//        }
-//
-//        if fileSize < 1000 {
-//            sizeString = "\(fileSize)" + " b"
-//        } else if fileSize >= 1000 && fileSize < 1000000 {
-//            //            let tmp = (Double(fileSize)/1000).rounded()
-//            sizeString = "\(fileSize/1000)" + " kb"
-//        } else if fileSize >= 1000000 && fileSize < 1000000000 {
-//            let tmp = (Double(fileSize)/100000).rounded()/10
-//            sizeString = "\(tmp)" + " Mb"
-//        } else if fileSize >= 1000000000 {
-//            let tmp = (Double(fileSize)/100000000).rounded()/10
-//            sizeString = "\(tmp)" + " Gb"
-//        }
-//
-//        return sizeString
-//    }

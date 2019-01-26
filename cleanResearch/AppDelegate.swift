@@ -34,6 +34,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var meetingsURL: URL?
     var conferencesURL: URL?
     var reviewsURL: URL?
+    var workDocsURL: URL?
+    var hiringURL: URL?
+    var travelURL: URL?
+    var notesURL: URL?
     var miscellaneousURL: URL?
     var docsDir: URL?
     
@@ -70,6 +74,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         meetingsURL = docURL?.appendingPathComponent("Meetings", isDirectory: true)
         conferencesURL = docURL?.appendingPathComponent("Conferences", isDirectory: true)
         reviewsURL = docURL?.appendingPathComponent("Reviews", isDirectory: true)
+        workDocsURL = docURL?.appendingPathComponent("Work documents", isDirectory: true)
+        hiringURL = workDocsURL?.appendingPathComponent("Hiring", isDirectory: true)
+        travelURL = docURL?.appendingPathComponent("Travel", isDirectory: true)
+        notesURL = docURL?.appendingPathComponent("Notes", isDirectory: true)
         miscellaneousURL = docURL?.appendingPathComponent("Miscellaneous", isDirectory: true)
         
         if iCloudURL != nil {
@@ -136,6 +144,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             }
             do {
                 try FileManager.default.createDirectory(at: reviewsURL!, withIntermediateDirectories: false, attributes: nil)
+            } catch let error as NSError {
+                print(error.localizedDescription);
+            }
+            do {
+                try FileManager.default.createDirectory(at: workDocsURL!, withIntermediateDirectories: false, attributes: nil)
+            } catch let error as NSError {
+                print(error.localizedDescription);
+            }
+            do {
+                try FileManager.default.createDirectory(at: hiringURL!, withIntermediateDirectories: true, attributes: nil)
+            } catch let error as NSError {
+                print(error.localizedDescription);
+            }
+            do {
+                try FileManager.default.createDirectory(at: travelURL!, withIntermediateDirectories: false, attributes: nil)
+            } catch let error as NSError {
+                print(error.localizedDescription);
+            }
+            do {
+                try FileManager.default.createDirectory(at: notesURL!, withIntermediateDirectories: false, attributes: nil)
             } catch let error as NSError {
                 print(error.localizedDescription);
             }

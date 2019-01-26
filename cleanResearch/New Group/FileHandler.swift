@@ -14,6 +14,29 @@ struct FileHandler {
     
     private let fileManagerDefault = FileManager.default
     
+    func getDates(url: URL) -> [Date] {
+        var defaultModDate = Date(timeIntervalSince1970: 0)
+        var defaultCreateDate = Date(timeIntervalSince1970: 0)
+        
+        do {
+            let attr = try fileManagerDefault.attributesOfItem(atPath: url.path)
+            defaultCreateDate = attr[FileAttributeKey.creationDate] as! Date
+            
+        } catch {
+            print("Error: \(error)")
+        }
+        
+        do {
+            let attr = try fileManagerDefault.attributesOfItem(atPath: url.path)
+            defaultModDate = attr[FileAttributeKey.modificationDate] as! Date
+            
+        } catch {
+            print("Error: \(error)")
+        }
+
+        return [defaultCreateDate, defaultModDate]
+    }
+
     func getFilenameFromURL(icloudURL: URL) -> String {
         var filename = String()
         if icloudURL.lastPathComponent.range(of:".icloud") != nil {
@@ -88,8 +111,6 @@ struct FileHandler {
                     pageThumbnail = UIImage(data: data)!
                 }
             }
-        } else if url.lastPathComponent.range(of:".m") != nil {
-            pageThumbnail = #imageLiteral(resourceName: "M")
         } else if url.lastPathComponent.range(of:".ai") != nil {
             pageThumbnail = #imageLiteral(resourceName: "AI")
         } else if url.lastPathComponent.range(of:".eps") != nil {
@@ -104,9 +125,58 @@ struct FileHandler {
             pageThumbnail = #imageLiteral(resourceName: "KeynoteIcon")
         } else if url.lastPathComponent.range(of:".txt") != nil {
             pageThumbnail = #imageLiteral(resourceName: "TXT")
+        } else if url.lastPathComponent.range(of:".avi") != nil {
+            pageThumbnail = #imageLiteral(resourceName: "AVI")
+        } else if url.lastPathComponent.range(of:".mov") != nil {
+            pageThumbnail = #imageLiteral(resourceName: "MOV")
+        } else if url.lastPathComponent.range(of:".m4a") != nil {
+            pageThumbnail = #imageLiteral(resourceName: "MOV") //FIX
+        } else if url.lastPathComponent.range(of:".mp4") != nil {
+            pageThumbnail = #imageLiteral(resourceName: "MOV") //FIX
+        } else if url.lastPathComponent.range(of:".gif") != nil {
+            pageThumbnail = #imageLiteral(resourceName: "GIF")
+        } else if url.lastPathComponent.range(of:".m") != nil {
+            pageThumbnail = #imageLiteral(resourceName: "M")
         }
         return pageThumbnail
         
     }
     
+    func getDeadline(date: Date?, string: String?, option: String?) -> (date: Date?, string: String?) {
+        if option == nil {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            
+            var dateString: String? = nil
+            if date != nil {
+                dateString = formatter.string(from: date!)
+            }
+            var dateValue: Date? = nil
+            if string != nil {
+                dateValue = formatter.date(from: string!)
+            }
+            return (dateValue, dateString)
+
+        } else {
+            
+            let formatter = DateFormatter()
+            if option == "Minutes" {
+                formatter.dateFormat = "yyyy-MM-dd HHmm"
+            }
+            
+            if option == "Seconds" {
+                formatter.dateFormat = "yyyy-MM-dd HHmmss"
+            }
+            
+            var dateString: String? = nil
+            if date != nil {
+                dateString = formatter.string(from: date!)
+            }
+            var dateValue: Date? = nil
+            if string != nil {
+                dateValue = formatter.date(from: string!)
+            }
+            return (dateValue, dateString)
+        }
+    }
 }

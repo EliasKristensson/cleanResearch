@@ -30,13 +30,21 @@ class ProgressMonitor: UIView {
     }
     
     func launchMonitor(displayText: String?) {
+        print("launchMonitor")
         
-        self.bringSubview(toFront: self)
-        self.center.y = iPadDimension[0] + settings[0]/2
-        self.center.x = iPadDimension[1]/2
+        self.isHidden = false
+        self.bringSubview(toFront: self) //MAIN THREAD ONLY
+        self.center.y = iPadDimension[0] + settings[0]/2 //MAIN THREAD ONLY
+        self.center.x = iPadDimension[1]/2  //MAIN THREAD ONLY
         self.textHeight = settings[0]*0.8
         self.textWidth = settings[1]*0.8
-        self.exitTimer = Timer.scheduledTimer(timeInterval: self.time, target: self, selector: #selector(close), userInfo: nil, repeats: false)
+        
+        if moveDownTimer != nil {
+            print("valid")
+            if moveDownTimer.isValid {
+                self.moveDownTimer.invalidate()
+            }
+        }
         self.moveDownTimer = Timer.scheduledTimer(timeInterval: self.time-0.5, target: self, selector: #selector(moveDown), userInfo: nil, repeats: false)
         self.label.frame = CGRect(x: self.frame.size.width / 2 - textWidth/2, y: self.frame.size.height / 2 - textHeight/2, width: textWidth, height: textHeight)
         if displayText != nil {
@@ -50,20 +58,25 @@ class ProgressMonitor: UIView {
     }
     
     func moveUp() {
+        print("moveUp")
+        self.center.y = iPadDimension[0] + settings[0]/2
         UIView.animate(withDuration: 0.5) {
-            self.center.y -= self.settings[0]*1.075
+            self.center.y -= self.settings[0]*1.15
         }
+        print(self.center.y)
     }
     
     @objc func moveDown() {
+        print("moveDown")
         UIView.animate(withDuration: 0.5) {
-            self.center.y += self.settings[0]*1.075
+            self.center.y += self.settings[0]*1.15
         }
+        print(self.center.y)
     }
     
     @objc func close() {
+        print("close")
         exitTimer.invalidate()
-//        NotificationCenter.default.post(name: Notification.Name.notifactionExit, object: nil)
     }
 
     

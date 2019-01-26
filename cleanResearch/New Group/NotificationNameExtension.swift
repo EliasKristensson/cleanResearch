@@ -24,8 +24,11 @@ extension Notification.Name {
     static let icloudFinished = Notification.Name(rawValue: "icloudFinished")
     static let reload = Notification.Name(rawValue: "reload")
     static let notifactionExit = Notification.Name(rawValue: "notifactionExit")
-    static let sendNotification = Notification.Name(rawValue: "sendNotification")
+    static let postNotification = Notification.Name(rawValue: "postNotification")
     static let updateView = Notification.Name(rawValue: "updateView")
+    static let blankPDFfinished = Notification.Name(rawValue: "blankPDFfinished")
+    static let saveFinished = Notification.Name(rawValue: "saveFinished")
+    
     
 //    static let allArticles = Notification.Name(rawValue: "All articles")
     //    static let updateArticle = Notification.Name(rawValue: "updateArticle")

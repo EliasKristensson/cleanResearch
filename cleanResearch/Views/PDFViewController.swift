@@ -76,6 +76,9 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
     var progressMonitor: ProgressMonitor!
     var dataManager: DataManager!
     
+//    let defaultLineWidth: CGFloat = 6
+    let forceSensitivity: CGFloat = 4.0
+    
     // 1: OUTLETS
     @IBOutlet weak var thumbnailIcon: UIBarButtonItem!
     @IBOutlet weak var bookmarkButton: UIBarButtonItem!
@@ -92,6 +95,8 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
     @IBOutlet weak var nextSearchResultButton: UIBarButtonItem!
     @IBOutlet weak var prevSearchResultButton: UIBarButtonItem!
     @IBOutlet weak var addTextButton: UIBarButtonItem!
+    @IBOutlet weak var addPageButton: UIBarButtonItem!
+    @IBOutlet weak var saveIndicator: UILabel!
     
     
     @IBAction func addTextTapped(_ sender: Any) {
@@ -417,12 +422,24 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
         searchResultsBeforeOrAfter()
     }
     
+    @IBAction func addPage(_ sender: Any) {
+        guard
+            let url = Bundle.main.url(forResource: "BlankPDF", withExtension: "pdf"),
+            let blankPDF = PDFDocument(url: url)
+            else { fatalError() }
+        
+        let lastPage = document.pageCount
+        document.insert(blankPDF.page(at: 0)!, at: lastPage)
+        setupThumbnailView()
+    }
+    
     
     
     
     override func viewDidLoad() {
         print("viewDidLoad - PDF")
         super.viewDidLoad()
+        
         
         navigationController?.isNavigationBarHidden = false
         navigationController?.navigationBar.barTintColor = UIColor.white
@@ -433,7 +450,7 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
         pdfView.document = document
         currentPage = pdfView.currentPage
         isCurrentPageBookmarked()
-
+        
         configureUI()
         setupThumbnailView()
         loadDefault()
@@ -445,9 +462,8 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(handleSettingsPopupClosing), name: Notification.Name.settingsHighlighter, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handlePageChange(notification:)), name: Notification.Name.PDFViewPageChanged, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(widgetTapped(notification:)), name: Notification.Name.PDFViewAnnotationHit, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(closeNotification), name: Notification.Name.notifactionExit, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(self.postNotification), name: Notification.Name.sendNotification, object: nil)
-
+        NotificationCenter.default.addObserver(self, selector: #selector(self.postNotification), name: Notification.Name.postNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(documentSaved), name: Notification.Name.saveFinished, object: nil)
         
         if saveTime > 0 {
             saveTimer = Timer.scheduledTimer(timeInterval: Double(saveTime*60), target: self, selector: #selector(saveDocument), userInfo: nil, repeats: true)
@@ -479,6 +495,14 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
         
         self.view.addSubview(progressMonitor)
         progressMonitor.isHidden = true
+        saveIndicator.isHidden = true
+//        self.view.bringSubview(toFront: saveIndicator)
+        
+        if currentFile.category == "Notes" {
+            self.addPageButton.isEnabled = true
+        } else {
+            self.addPageButton.isEnabled = false
+        }
         
     }
 
@@ -487,14 +511,18 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
     
     
     // MARK:- OBJECT C
-    @objc func closeNotification() {
-//        progressMonitor.removeFromSuperview()
-        progressMonitor.isHidden = true
+    
+    @objc func documentSaved() {
+        print("documentSaved")
+        
+        DispatchQueue.main.async {
+            self.saveIndicator.isHidden = true
+        }
     }
     
     @objc private func handlePageChange(notification: Notification)
     {
-        if let _ = pdfView.currentPage?.pageRef?.pageNumber {
+        if let number = pdfView.currentPage?.pageRef?.pageNumber {
             isCurrentPageBookmarked()
         }
     }
@@ -568,60 +596,45 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
     
     @objc func postNotification() {
         DispatchQueue.main.async {
-            print("PDF VC")
-//            self.view.addSubview(self.progressMonitor)
+            print("postNotification")
             self.progressMonitor.isHidden = false
-            self.progressMonitor.bringSubview(toFront: self.view)
-//            self.view.bringSubview(toFront: self.progressMonitor)
+            self.view.addSubview(self.progressMonitor)
+            //            self.progressMonitor.bringSubview(toFront: self.view)
+            self.view.bringSubview(toFront: self.progressMonitor)
             self.progressMonitor.launchMonitor(displayText: nil)
         }
     }
     
     @objc func saveDocument() {
+        print("saveDocument")
+        
         if changesMade {
+            saveIndicator.isHidden = false
             removeSearchResults()
             
-//            self.view.bringSubview(toFront: progressMonitor)
+//            self.view.bringSubview(toFront: saveIndicator)
+            self.view.bringSubview(toFront: progressMonitor)
             self.progressMonitor.isHidden = false
-            self.progressMonitor.bringSubview(toFront: self.view)
             dataManager.savePDF(file: currentFile, document: document)
-//            print("Save started")
-//            self.sendNotification(text: "Autosaving " + self.PDFfilename)
-//
-//            let dispatchQueue = DispatchQueue(label: "QueueIdentification", qos: .background)
-//            dispatchQueue.async{
-//                if self.iCloudURL != nil {
-//                    if !self.document.write(to: self.iCloudURL!) {
-//                        print("Failed to save PDF to iCloud drive")
-//                    } else {
-//                        self.changesMade = false
-//                        print("Saved " + self.PDFfilename + " to iCloud drive")
-//                        self.progressMonitor.text = "Saved " + self.PDFfilename + " to iCloud"
-//                        self.postNotification()
-//                    }
-//                }
-//                if self.localURL != nil {
-//                    if !self.document.write(to: self.localURL!) {
-//                        print("Failed to save PDF to local folder")
-//                    } else {
-//                        self.changesMade = false
-//                        print("Saved " + self.PDFfilename + " locally")
-//                        self.progressMonitor.text = "Saved " + self.PDFfilename + " locally"
-//                        self.postNotification()
-//                    }
-//                }
-//            }
+            
         } else {
             print("No changes made, not saving")
         }
     }
     
     @objc func sendNotification(text: String) {
-//        self.view.addSubview(self.progressMonitor)
-//        self.view.bringSubview(toFront: self.progressMonitor)
+        
+        print("sendNotification - VC")
         self.progressMonitor.isHidden = false
-        self.progressMonitor.bringSubview(toFront: self.view)
+        self.view.addSubview(self.progressMonitor)
+        self.view.bringSubview(toFront: self.progressMonitor)
         self.progressMonitor.launchMonitor(displayText: text)
+        
+////        self.view.addSubview(self.progressMonitor)
+////        self.view.bringSubview(toFront: self.progressMonitor)
+//        self.progressMonitor.isHidden = false
+//        self.progressMonitor.bringSubview(toFront: self.view)
+//        self.progressMonitor.launchMonitor(displayText: text)
     }
     
     @objc func widgetTapped(notification: Notification) {
@@ -684,13 +697,48 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
     }
     
     func setupThumbnailView() {
-        pdfThumbnailView = PDFThumbnailView(frame: CGRect(x: self.view.bounds.maxX - thumbnailPanelSize, y: 100, width: thumbnailPanelSize, height: self.view.bounds.size.height - 200))
+        print("setupThumbnailView")
+        
+        if UIDevice.current.orientation.isLandscape {
+            print("Landscape")
+            print(self.view.bounds.maxX)
+            print(self.view.bounds.maxY)
+            print(self.view.bounds.height)
+            print(self.view.bounds.width)
+            
+            if self.view.bounds.maxX > self.view.bounds.maxY {
+                print("L1")
+                pdfThumbnailView = PDFThumbnailView(frame: CGRect(x: self.view.bounds.maxX - thumbnailPanelSize, y: 100, width: thumbnailPanelSize, height: self.view.bounds.size.height - 200))
+            } else {
+                print("L2")
+                pdfThumbnailView = PDFThumbnailView(frame: CGRect(x: self.view.bounds.maxY - thumbnailPanelSize, y: 100, width: thumbnailPanelSize, height: self.view.bounds.size.width - 200))
+            }
+        } else {
+            print("Portrait")
+            print(self.view.bounds.maxX)
+            print(self.view.bounds.maxY)
+            print(self.view.bounds.height)
+            print(self.view.bounds.width)
+            
+            if self.view.bounds.maxX < self.view.bounds.maxY {
+                print("P1")
+                pdfThumbnailView = PDFThumbnailView(frame: CGRect(x: self.view.bounds.maxX - thumbnailPanelSize, y: 100, width: thumbnailPanelSize, height: self.view.bounds.size.height - 200))
+            } else {
+                print("P2")
+                pdfThumbnailView = PDFThumbnailView(frame: CGRect(x: self.view.bounds.maxY - thumbnailPanelSize, y: 100, width: thumbnailPanelSize, height: self.view.bounds.size.width - 200))
+            }
+        }
         pdfThumbnailView.layoutMode = .vertical
-        pdfThumbnailView.thumbnailSize = CGSize(width: 50.0, height: 50.0)
+        if document.pageCount > 300 {
+            pdfThumbnailView.thumbnailSize = CGSize(width: 40.0, height: 40.0)
+        } else {
+            pdfThumbnailView.thumbnailSize = CGSize(width: 50.0, height: 50.0)
+        }
         pdfThumbnailView.pdfView = pdfView
         pdfThumbnailView.backgroundColor = sidebarBackgroundColor
         pdfThumbnailView.alpha = 0.9
         self.view.addSubview(pdfThumbnailView)
+        self.view.bringSubview(toFront: pdfThumbnailView)
         pdfThumbnailView.isHidden = true
     }
     
@@ -869,7 +917,17 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
         }
     }
     
-    
+    func lineWidthForDrawing(context: CGContext?, touch: UITouch) -> CGFloat {
+        
+        var lineWidth = penThickness!
+        
+        if touch.force > 0 {
+            print(touch.force)
+            lineWidth = touch.force * forceSensitivity
+        }
+        
+        return lineWidth
+    }
     
     
     // MARK: - Search bar
@@ -1038,7 +1096,13 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
     }
     
 
-
+    
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        pdfThumbnailView.removeFromSuperview()
+        setupThumbnailView()
+        thumbnailIcon.image = #imageLiteral(resourceName: "Layers")
+    }
+    
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
         // Dispose of any resources that can be recreated.
@@ -1049,7 +1113,10 @@ class PDFViewController: UIViewController, UISearchBarDelegate {
         bookmarks.lastPageVisited = Int32((pdfView.currentPage?.pageRef?.pageNumber)!)
         NotificationCenter.default.post(name: Notification.Name.closingPDF, object: self)
     }
-        
+
+    override func prefersHomeIndicatorAutoHidden() -> Bool {
+        return true
+    }
 }
 
 
