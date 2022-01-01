@@ -13,6 +13,8 @@ import CloudKit
 
 class LoadingViewController: UIViewController {
 
+    @IBOutlet weak var loadingIndicator: UIActivityIndicatorView!
+    
     var appDelegate: AppDelegate!
     var icloudAvailable: Bool!
     let fileManagerDefault = FileManager.default
@@ -38,15 +40,18 @@ class LoadingViewController: UIViewController {
     var travelURL: URL!
     var miscellaneousURL: URL!
     var patentsURL: URL!
+    var reportsURL: URL!
+    var projectsURL: URL!
     var docsURL: URL!
     var notesURL: URL!
-//    var iCloudURL: URL! //IS THIS NEEDED?
     var localURL: URL!
     
-    let categories: [String] = ["Recently", "Publications", "Books", "Economy", "Manuscripts", "Presentations", "Proposals", "Supervision", "Teaching", "Patents", "Courses", "Meetings", "Conferences", "Reviews", "Work documents", "Travel", "Notes", "Miscellaneous"]
+    let categories: [String] = ["Recently", "Publications", "Books", "Economy", "Manuscripts", "Presentations", "Proposals", "Supervision", "Teaching", "Patents", "Courses", "Meetings", "Conferences", "Reviews", "Work documents", "Travel", "Notes", "Miscellaneous", "Reading list", "Memos", "Settings", "Bulletin board", "Search", "Reports", "Projects", "Fast folder"]
 
     let fileHandler = FileHandler()
     var dataManager = DataManager()
+    var pdfViewManager = PDFViewManager()
+    var navigator: Navigator!
     
     var localFiles: [[LocalFile]] = [[]]
     var orderedCategories: [Categories] = []
@@ -61,12 +66,15 @@ class LoadingViewController: UIViewController {
         super.viewDidLoad()
         self.navigationController?.isNavigationBarHidden = true
         
+        loadingIndicator.startAnimating()
+        
+        NotificationCenter.default.addObserver(self, selector: #selector(self.readingFilesFinished), name: Notification.Name.readingFilesFinished, object: nil)
+        
         let app = UIApplication.shared
         appDelegate = (app.delegate as! AppDelegate)
         icloudAvailable = appDelegate.iCloudAvailable!
         context = appDelegate.context
         
-//        self.iCloudURL = self.appDelegate.iCloudURL
         self.docsURL = self.appDelegate.docURL
         self.localURL = self.appDelegate.localURL
         self.publicationsURL = self.appDelegate.publicationURL
@@ -87,6 +95,8 @@ class LoadingViewController: UIViewController {
         self.travelURL = self.appDelegate.travelURL
         self.notesURL = self.appDelegate.notesURL
         self.miscellaneousURL = self.appDelegate.miscellaneousURL
+        self.reportsURL = self.appDelegate.reportsURL
+        self.projectsURL = self.appDelegate.projectsURL
         
         privateDatabase = container().privateCloudDatabase
         recordZone = CKRecordZone(zoneName: "CleanResearchZone")
@@ -106,6 +116,8 @@ class LoadingViewController: UIViewController {
         dataManager.context = context
         dataManager.recordZone = recordZone
         dataManager.privateDatabase = privateDatabase
+        navigator = Navigator(categoryList: categories)
+        navigator.selectedCategory = "Recently"
         setupProgressMonitor()
         
         dataManager.docsURL = docsURL
@@ -129,31 +141,30 @@ class LoadingViewController: UIViewController {
         dataManager.hiringURL = hiringURL
         dataManager.travelURL = travelURL 
         dataManager.miscellaneousURL = miscellaneousURL
+        dataManager.reportsURL = reportsURL
         dataManager.notesURL = notesURL
+        dataManager.projectsURL = projectsURL
         dataManager.categories = categories
+        dataManager.navigator = navigator
 
-        dataManager.loadCoreData()
-        dataManager.setupDefaultCoreDataTypes()
+        pdfViewManager.dataManager = dataManager
         
         if icloudAvailable {
-            sendNotification(text: "Reading iCloud drive folders")
+            dataManager.loadCoreData()
+            orderedCategories = dataManager.categoriesCD.sorted(by: {($0.numberViews, Int16.max - $0.originalOrder) > ($1.numberViews, Int16.max - $1.originalOrder)})
+            dataManager.setupDefaultCoreDataTypes()
             dataManager.readAllIcloudDriveFolders()
-//            dataManager.cleanOutEmptyDatabases()
-        }
-        
-        orderedCategories = dataManager.categoriesCD.sorted(by: {($0.numberViews, Int16.max - $0.originalOrder) > ($1.numberViews, Int16.max - $1.originalOrder)})
-        
-        if !icloudAvailable! {
-            alert(title: "iCloud Drive not available", message: "Log into your iCloud account and add iCloud Drive services")
         } else {
-            performSegue(withIdentifier: "loadMainVC", sender: self)
+            alert(title: "iCloud Drive not available", message: "Log into your iCloud account and add iCloud Drive services")
         }
         
-
     }
     
     
-    
+    @objc func readingFilesFinished() {
+        sendNotification(text: "Reading iCloud drive folders")
+        performSegue(withIdentifier: "loadMainVC", sender: self)
+    }
     
     func sendNotification(text: String) {
         DispatchQueue.main.async {
@@ -165,24 +176,18 @@ class LoadingViewController: UIViewController {
         print("setupProgressMonitor")
         
         if UIDevice.current.orientation.isLandscape {
-            print("Landscape")
             if self.view.bounds.maxX < self.view.bounds.maxY { //Works
-                print("L1")
                 progressMonitor.frame = CGRect(x: self.view.bounds.maxY/2 - progressMonitorSettings[1]/2, y: self.view.bounds.size.height+progressMonitorSettings[0], width: progressMonitorSettings[1], height: progressMonitorSettings[0])
                 progressMonitor.iPadDimension = [self.view.bounds.maxX, self.view.bounds.maxY] // [y,x]
             } else { //Normal
-                print("L2")
                 progressMonitor.frame = CGRect(x: self.view.bounds.maxX/2 - progressMonitorSettings[1]/2, y: self.view.bounds.size.width+progressMonitorSettings[0], width: progressMonitorSettings[1], height: progressMonitorSettings[0])
                 progressMonitor.iPadDimension = [self.view.bounds.maxY, self.view.bounds.maxX]
             }
         } else {
-            print("Portrait")
             if self.view.bounds.maxX < self.view.bounds.maxY { //Normal, doesn't work
-                print("P1")
                 progressMonitor.frame = CGRect(x: self.view.bounds.maxX/2 - progressMonitorSettings[1]/2, y: self.view.bounds.size.height+progressMonitorSettings[0], width: progressMonitorSettings[1], height: progressMonitorSettings[0])
                 progressMonitor.iPadDimension = [self.view.bounds.maxY, self.view.bounds.maxX]
             } else { //Works
-                print("P2")
                 progressMonitor.frame = CGRect(x: self.view.bounds.maxY/2 - progressMonitorSettings[1]/2, y: self.view.bounds.size.width+progressMonitorSettings[0], width: progressMonitorSettings[1], height: progressMonitorSettings[0])
                 progressMonitor.iPadDimension = [self.view.bounds.maxX, self.view.bounds.maxY]
             }
@@ -207,10 +212,13 @@ class LoadingViewController: UIViewController {
     }
     
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        print("prepare for segue to main VC")
+        
+        loadingIndicator.stopAnimating()
         
         let destination = segue.destination as! ViewController
         destination.dataManager = dataManager
+        destination.navigator = navigator
+        destination.pdfViewManager = pdfViewManager
         destination.categories = categories
         destination.progressMonitor = progressMonitor
         destination.orderedCategories = orderedCategories
@@ -226,8 +234,5 @@ class LoadingViewController: UIViewController {
         return .all
     }
     
-    override var shouldAutorotate: Bool {
-        return true
-    }
 }
 

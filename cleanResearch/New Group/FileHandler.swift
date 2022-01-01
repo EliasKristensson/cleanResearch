@@ -93,9 +93,10 @@ struct FileHandler {
             
         } else if url.lastPathComponent.range(of:".pdf") != nil || url.lastPathComponent.range(of:".PDF") != nil {
             if let document = PDFDocument(url: url) {
-                let page: PDFPage!
-                page = document.page(at: pageNumber)!
-                pageThumbnail = page.thumbnail(of: CGSize(width: 210, height: 297), for: .artBox)
+//                let page: PDFPage!
+                if let tmp = document.page(at: pageNumber) {
+                    pageThumbnail = tmp.thumbnail(of: CGSize(width: 210, height: 297), for: .artBox)
+                }
             }
         } else if url.lastPathComponent.range(of:".tiff") != nil {
             pageThumbnail = #imageLiteral(resourceName: "TIFF")
@@ -155,17 +156,18 @@ struct FileHandler {
             if string != nil {
                 dateValue = formatter.date(from: string!)
             }
+            
             return (dateValue, dateString)
 
         } else {
             
             let formatter = DateFormatter()
             if option == "Minutes" {
-                formatter.dateFormat = "yyyy-MM-dd HHmm"
+                formatter.dateFormat = "yyyy-MM-dd HH:mm"
             }
             
             if option == "Seconds" {
-                formatter.dateFormat = "yyyy-MM-dd HHmmss"
+                formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
             }
             
             var dateString: String? = nil

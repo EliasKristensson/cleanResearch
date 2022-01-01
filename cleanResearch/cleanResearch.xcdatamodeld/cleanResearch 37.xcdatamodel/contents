@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="16119" systemVersion="19E287" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
+    <entity name="Applicant" representedClassName="Applicant" syncable="YES" codeGenerationType="class">
+        <attribute name="age" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="announcement" optional="YES" attributeType="String"/>
+        <attribute name="degree" optional="YES" attributeType="String"/>
+        <attribute name="education" optional="YES" attributeType="String"/>
+        <attribute name="grade" optional="YES" attributeType="Integer 16" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="name" optional="YES" attributeType="String"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="path" optional="YES" attributeType="String"/>
+        <attribute name="qualifies" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+    </entity>
+    <entity name="Author" representedClassName="Author" syncable="YES" codeGenerationType="class">
+        <attribute name="name" optional="YES" attributeType="String"/>
+        <attribute name="sortNumber" optional="YES" attributeType="String"/>
+        <relationship name="publication" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Publication" inverseName="author" inverseEntity="Publication"/>
+    </entity>
+    <entity name="Book" representedClassName="Book" syncable="YES" codeGenerationType="class">
+        <attribute name="dateCreated" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="dateModified" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="favorite" optional="YES" attributeType="String"/>
+        <attribute name="filename" optional="YES" attributeType="String"/>
+        <attribute name="note" optional="YES" attributeType="String"/>
+        <attribute name="rank" optional="YES" attributeType="Float" defaultValueString="0" usesScalarValueType="YES"/>
+        <relationship name="bookmarks" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Bookmarks" inverseName="book" inverseEntity="Bookmarks"/>
+        <relationship name="booksGroup" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="BooksGroup" inverseName="book" inverseEntity="BooksGroup"/>
+    </entity>
+    <entity name="Bookmarks" representedClassName="Bookmarks" syncable="YES" codeGenerationType="class">
+        <attribute name="category" optional="YES" attributeType="String"/>
+        <attribute name="filename" optional="YES" attributeType="String"/>
+        <attribute name="label" optional="YES" attributeType="Transformable" customClassName="[String]"/>
+        <attribute name="lastPageVisited" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="page" optional="YES" attributeType="Transformable" customClassName="[Int]"/>
+        <attribute name="path" optional="YES" attributeType="String"/>
+        <relationship name="book" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Book" inverseName="bookmarks" inverseEntity="Book"/>
+        <relationship name="publication" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Publication" inverseName="bookmarks" inverseEntity="Publication"/>
+    </entity>
+    <entity name="BooksGroup" representedClassName="BooksGroup" syncable="YES" codeGenerationType="class">
+        <attribute name="dateModified" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="sortNumber" optional="YES" attributeType="String"/>
+        <attribute name="tag" optional="YES" attributeType="String"/>
+        <relationship name="book" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Book" inverseName="booksGroup" inverseEntity="Book"/>
+    </entity>
+    <entity name="Bulletin" representedClassName="Bulletin" syncable="YES" codeGenerationType="class">
+        <attribute name="bulletinName" optional="YES" attributeType="String"/>
+        <attribute name="category" optional="YES" attributeType="String"/>
+        <attribute name="dateModified" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="filename" optional="YES" attributeType="String"/>
+        <attribute name="path" optional="YES" attributeType="String"/>
+    </entity>
+    <entity name="BulletinBoard" representedClassName="BulletinBoard" syncable="YES" codeGenerationType="class">
+        <attribute name="bulletinName" optional="YES" attributeType="String"/>
+        <attribute name="category" optional="YES" attributeType="Transformable" customClassName="[String]"/>
+        <attribute name="dateModified" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="filename" optional="YES" attributeType="Transformable" customClassName="[String]"/>
+        <attribute name="path" optional="YES" attributeType="Transformable" customClassName="[String]"/>
+    </entity>
+    <entity name="Categories" representedClassName="Categories" syncable="YES" codeGenerationType="class">
+        <attribute name="displayOrder" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="name" optional="YES" attributeType="String"/>
+        <attribute name="numberViews" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="originalOrder" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+    </entity>
+    <entity name="Exam" representedClassName="Exam" syncable="YES" codeGenerationType="class">
+        <attribute name="course" optional="YES" attributeType="String"/>
+        <attribute name="date" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="maxScore" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="path" optional="YES" attributeType="Transformable" customClassName="[String]"/>
+        <attribute name="problems" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="students" optional="YES" attributeType="Transformable" customClassName="[Int16]"/>
+        <attribute name="subProblems" optional="YES" attributeType="Transformable" customClassName="[Int]"/>
+        <relationship name="student" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Score" inverseName="exam" inverseEntity="Score"/>
+    </entity>
+    <entity name="Expense" representedClassName="Expense" syncable="YES" codeGenerationType="class">
+        <attribute name="active" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="amount" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="comment" optional="YES" attributeType="String"/>
+        <attribute name="dateAdded" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="idNumber" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="overhead" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="pdfURL" optional="YES" attributeType="URI"/>
+        <attribute name="reference" optional="YES" attributeType="String"/>
+        <attribute name="type" optional="YES" attributeType="String"/>
+        <attribute name="years" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <relationship name="project" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Project" inverseName="expense" inverseEntity="Project"/>
+    </entity>
+    <entity name="FastFolder" representedClassName="FastFolder" syncable="YES" codeGenerationType="class">
+        <attribute name="category" optional="YES" attributeType="String"/>
+        <attribute name="categoryURL" optional="YES" attributeType="URI"/>
+        <attribute name="folder" optional="YES" attributeType="String"/>
+        <attribute name="folderLevel" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="folders" optional="YES" attributeType="Transformable" customClassName="[String]"/>
+        <attribute name="mainFolder" optional="YES" attributeType="String"/>
+        <attribute name="paths" optional="YES" attributeType="Transformable" customClassName="[String]"/>
+        <attribute name="subFolder" optional="YES" attributeType="String"/>
+        <attribute name="urls" optional="YES" attributeType="Transformable" customClassName="[URL]"/>
+    </entity>
+    <entity name="Favorites" representedClassName="Favorites" syncable="YES" codeGenerationType="class">
+        <attribute name="category" optional="YES" attributeType="String"/>
+        <attribute name="dateModified" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="filename" optional="YES" attributeType="String"/>
+        <attribute name="path" optional="YES" attributeType="String"/>
+    </entity>
+    <entity name="FundingOrganisation" representedClassName="FundingOrganisation" syncable="YES" codeGenerationType="class">
+        <attribute name="amount" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="currency" optional="YES" attributeType="String"/>
+        <attribute name="deadline" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="instructions" optional="YES" attributeType="String"/>
+        <attribute name="name" optional="YES" attributeType="String"/>
+        <attribute name="website" optional="YES" attributeType="String"/>
+    </entity>
+    <entity name="Grade" representedClassName="Grade" syncable="YES" codeGenerationType="class">
+        <attribute name="filename" optional="YES" attributeType="String"/>
+        <attribute name="grade" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="path" optional="YES" attributeType="String"/>
+        <attribute name="show" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="type" optional="YES" attributeType="String"/>
+    </entity>
+    <entity name="HotFolder" representedClassName="HotFolder" syncable="YES" codeGenerationType="class">
+        <attribute name="category" optional="YES" attributeType="String"/>
+        <attribute name="filename" optional="YES" attributeType="String"/>
+        <attribute name="path" optional="YES" attributeType="String"/>
+        <attribute name="url" optional="YES" attributeType="Transformable" valueTransformerName="" customClassName="[URL]"/>
+    </entity>
+    <entity name="Journal" representedClassName="Journal" syncable="YES" codeGenerationType="class">
+        <attribute name="name" optional="YES" attributeType="String"/>
+        <attribute name="sortNumber" optional="YES" attributeType="String"/>
+        <relationship name="publication" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Publication" inverseName="journal" inverseEntity="Publication"/>
+    </entity>
+    <entity name="Manuscript" representedClassName="Manuscript" syncable="YES" codeGenerationType="class">
+        <attribute name="dateCreated" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="dateModified" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="favorite" optional="YES" attributeType="String"/>
+        <attribute name="filename" optional="YES" attributeType="String"/>
+        <attribute name="note" optional="YES" attributeType="String"/>
+        <attribute name="parentFolder" optional="YES" attributeType="String"/>
+        <attribute name="rank" optional="YES" attributeType="Float" defaultValueString="0.0" usesScalarValueType="YES"/>
+    </entity>
+    <entity name="Memo" representedClassName="Memo" syncable="YES" codeGenerationType="class">
+        <attribute name="color" optional="YES" attributeType="String"/>
+        <attribute name="dateCreated" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="dateModified" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deadline" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="lines" optional="YES" attributeType="Transformable" customClassName="[String]"/>
+        <attribute name="tag" optional="YES" attributeType="String"/>
+        <attribute name="text" optional="YES" attributeType="String"/>
+        <attribute name="title" optional="YES" attributeType="String"/>
+    </entity>
+    <entity name="Notes" representedClassName="Notes" syncable="YES" codeGenerationType="class">
+        <attribute name="category" optional="YES" attributeType="String"/>
+        <attribute name="dateModified" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="filename" optional="YES" attributeType="String"/>
+        <attribute name="idNumber" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="path" optional="YES" attributeType="String"/>
+        <attribute name="text" optional="YES" attributeType="String"/>
+    </entity>
+    <entity name="Project" representedClassName="Project" syncable="YES" codeGenerationType="class">
+        <attribute name="amountReceived" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="amountRemaining" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="currency" optional="YES" attributeType="String"/>
+        <attribute name="dateCreated" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="dateModified" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deadline" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="name" optional="YES" attributeType="String"/>
+        <relationship name="expense" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Expense" inverseName="project" inverseEntity="Expense"/>
+    </entity>
+    <entity name="Publication" representedClassName="Publication" syncable="YES" codeGenerationType="class">
+        <attribute name="dateCreated" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="dateModified" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="favorite" optional="YES" attributeType="String"/>
+        <attribute name="filename" optional="YES" attributeType="String"/>
+        <attribute name="note" optional="YES" attributeType="String"/>
+        <attribute name="rank" optional="YES" attributeType="Float" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="recordName" optional="YES" attributeType="String"/>
+        <attribute name="thumbnail" optional="YES" attributeType="Transformable"/>
+        <attribute name="title" optional="YES" attributeType="String"/>
+        <attribute name="url" optional="YES" attributeType="URI"/>
+        <attribute name="year" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <relationship name="author" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Author" inverseName="publication" inverseEntity="Author"/>
+        <relationship name="bookmarks" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Bookmarks" inverseName="publication" inverseEntity="Bookmarks"/>
+        <relationship name="journal" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Journal" inverseName="publication" inverseEntity="Journal"/>
+        <relationship name="publicationGroup" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="PublicationGroup" inverseName="publication" inverseEntity="PublicationGroup"/>
+    </entity>
+    <entity name="PublicationGroup" representedClassName="PublicationGroup" syncable="YES" codeGenerationType="class">
+        <attribute name="dateModified" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="sortNumber" optional="YES" attributeType="String"/>
+        <attribute name="tag" optional="YES" attributeType="String"/>
+        <relationship name="publication" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Publication" inverseName="publicationGroup" inverseEntity="Publication"/>
+    </entity>
+    <entity name="ReadingList" representedClassName="ReadingList" syncable="YES" codeGenerationType="class">
+        <attribute name="category" optional="YES" attributeType="String"/>
+        <attribute name="dateModified" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="filename" optional="YES" attributeType="String"/>
+        <attribute name="path" optional="YES" attributeType="String"/>
+    </entity>
+    <entity name="Recent" representedClassName="Recent" syncable="YES" codeGenerationType="class">
+        <attribute name="category" optional="YES" attributeType="String"/>
+        <attribute name="dateOpened" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="favorite" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="filename" optional="YES" attributeType="String"/>
+        <attribute name="path" optional="YES" attributeType="String"/>
+        <attribute name="timesOpened" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+    </entity>
+    <entity name="Score" representedClassName="Score" syncable="YES" codeGenerationType="class">
+        <attribute name="course" optional="YES" attributeType="String"/>
+        <attribute name="date" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="examId" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="id" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="name" optional="YES" attributeType="String"/>
+        <attribute name="score" optional="YES" attributeType="Transformable" customClassName="[[Double]]"/>
+        <attribute name="totalScore" optional="YES" attributeType="Double" defaultValueString="0" usesScalarValueType="YES"/>
+        <relationship name="exam" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Exam" inverseName="student" inverseEntity="Exam"/>
+    </entity>
+    <elements>
+        <element name="Applicant" positionX="-468" positionY="117" width="128" height="180"/>
+        <element name="Author" positionX="-297.78125" positionY="-56.46484375" width="128" height="90"/>
+        <element name="Book" positionX="-670.1640625" positionY="110.58984375" width="128" height="163"/>
+        <element name="Bookmarks" positionX="-481.66796875" positionY="248.72265625" width="128" height="165"/>
+        <element name="BooksGroup" positionX="-520.875" positionY="-33.0546875" width="128" height="103"/>
+        <element name="Bulletin" positionX="-468" positionY="117" width="128" height="120"/>
+        <element name="BulletinBoard" positionX="-468" positionY="117" width="128" height="120"/>
+        <element name="Categories" positionX="-468" positionY="117" width="128" height="103"/>
+        <element name="Exam" positionX="-1063.87890625" positionY="214.62109375" width="128" height="178"/>
+        <element name="Expense" positionX="-153" positionY="288" width="128" height="208"/>
+        <element name="FastFolder" positionX="-468" positionY="117" width="128" height="178"/>
+        <element name="Favorites" positionX="-468" positionY="117" width="128" height="105"/>
+        <element name="FundingOrganisation" positionX="-555.87890625" positionY="593.76171875" width="128" height="135"/>
+        <element name="Grade" positionX="-815.8984375" positionY="52.44140625" width="128" height="120"/>
+        <element name="HotFolder" positionX="-506.98046875" positionY="468.94921875" width="128" height="103"/>
+        <element name="Journal" positionX="124" positionY="-36" width="128" height="90"/>
+        <element name="Manuscript" positionX="115" positionY="93" width="128" height="150"/>
+        <element name="Memo" positionX="33.4921875" positionY="476.77734375" width="128" height="180"/>
+        <element name="Notes" positionX="-722.078125" positionY="523.43359375" width="128" height="135"/>
+        <element name="Project" positionX="43" positionY="291" width="128" height="165"/>
+        <element name="Publication" positionX="-63" positionY="-18" width="128" height="268"/>
+        <element name="PublicationGroup" positionX="-321.2421875" positionY="95.88671875" width="128" height="103"/>
+        <element name="ReadingList" positionX="-158.0703125" positionY="507.41796875" width="128" height="105"/>
+        <element name="Recent" positionX="-301.12109375" positionY="448.27734375" width="128" height="135"/>
+        <element name="Score" positionX="-843.4765625" positionY="294.5625" width="128" height="163"/>
+    </elements>
+</model>

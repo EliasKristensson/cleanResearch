@@ -10,24 +10,36 @@ import UIKit
 import PDFKit
 
 protocol DrawingViewDelegate: class {
-    func didEndDrawLine(bezierPath: UIBezierPath)
+    func didEndDrawLine(bezierPath: UIBezierPath, page: PDFPage)
 }
 
 class DrawingView: UIView {
     
-    var annotationPath: UIBezierPath!
+    let splinePath = UIBezierPath()
+    var interpolationPoints = [CGPoint]()
+    var spline: Bool!
+    
+//    var annotationSettings: [Int]!
+    var page: PDFPage!
+//    var annotationPath: UIBezierPath!
+    var annotationPath = UIBezierPath()
+    var annotationPoints = [CGPoint]()
+    
     var lastPoint: CGPoint!
     var lastPointPDF: CGPoint!
     var drawPath: UIBezierPath!
-    var pointCounter: Int = 0
-    let pointLimit: Int = 128
+    var didDraw = false
+//    var pointCounter: Int = 0
+//    let pointLimit: Int = 256//128 IS THIS REQUIRED?
     var preRenderImage: UIImage!
     var pdfView: PDFView!
-    var pdfPage: PDFPage!
+    var document: PDFDocument!
     weak var delegate: DrawingViewDelegate?
     
     var thickness: CGFloat!
     var drawColor: UIColor!
+    
+    var pdfViewManager: PDFViewManager!
     
     // MARK: - Initialization
     override init(frame: CGRect) {
@@ -35,6 +47,9 @@ class DrawingView: UIView {
         
         initBezierPath()
     }
+    
+    
+    
     
     required init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
@@ -87,24 +102,73 @@ class DrawingView: UIView {
         drawPath.stroke()
     }
     
+    
+    
+    
+    
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard let currentPage = pdfView.currentPage else {return}
+        pdfViewManager.touchState = .active
+        didDraw = false
         
         if let touch = touches.first {
-            annotationPath = UIBezierPath()
+            annotationPath.removeAllPoints()
+            annotationPoints.removeAll()
+//            annotationPath = UIBezierPath()
+//            interpolationPoints.removeAll()
             
-            lastPoint = touch.location(in: self)
-            lastPointPDF = pdfView.convert(lastPoint, to: currentPage)
-            pointCounter = 0
+//            lastPoint = touch.location(in: self)
+            lastPoint = touch.location(in: pdfView)
+
+            guard let nearest = pdfView.page(for: lastPoint, nearest: true) else {return}
+            page = nearest
+            
+            lastPointPDF = pdfView.convert(lastPoint, to: page)
+            annotationPoints.append(lastPointPDF)
+//            interpolationPoints.append(lastPointPDF)
         }
     }
     
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard let currentPage = pdfView.currentPage else {return}
+        guard let touch = touches.first else { return }
         
-        if let touch = touches.first {
+        didDraw = true
+        
+        if let coalescedTouches = event?.coalescedTouches(for: touch) {
+
+            for point in coalescedTouches {
+                let newPoint = point.location(in: self)
+                let newPointPDF = pdfView.convert(newPoint, to: page)
+                
+                annotationPoints.append(newPointPDF)
+//                interpolationPoints.append(newPointPDF)
+
+                if spline {
+                    annotationPath.removeAllPoints()
+                    annotationPath.interpolatePointsWithHermite(interpolationPoints: annotationPoints)
+                } else {
+                    annotationPath.move(to: lastPointPDF)
+                    annotationPath.addLine(to: newPointPDF)
+                }
+                
+//                splinePath.removeAllPoints()
+//                splinePath.interpolatePointsWithHermite(interpolationPoints: interpolationPoints)
+                
+                drawPath.move(to: lastPoint)
+                drawPath.addLine(to: newPoint)
+//                annotationPath.move(to: lastPointPDF)
+//                annotationPath.addLine(to: newPointPDF)
+
+                lastPoint = newPoint
+                lastPointPDF = newPointPDF
+
+            }
+            
+            setNeedsDisplay()
+            
+        } else {
+
             let newPoint = touch.location(in: self)
-            let newPointPDF = pdfView.convert(newPoint, to: currentPage)
+            let newPointPDF = pdfView.convert(newPoint, to: page)
             
             drawPath.move(to: lastPoint)
             drawPath.addLine(to: newPoint)
@@ -114,27 +178,24 @@ class DrawingView: UIView {
             lastPoint = newPoint
             lastPointPDF = newPointPDF
             
-            pointCounter += 1
+            setNeedsDisplay()
             
-            if pointCounter == pointLimit {
-                pointCounter = 0
-                renderToImage()
-                setNeedsDisplay()
-                drawPath.removeAllPoints()
-            } else {
-                setNeedsDisplay()
-            }
         }
     }
     
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         
-        pointCounter = 0
-        renderToImage()
-        setNeedsDisplay()
-        delegate?.didEndDrawLine(bezierPath: annotationPath)
-        clear()
-        
+        if didDraw {
+            if spline {
+                annotationPath.removeAllPoints()
+                annotationPath.interpolatePointsWithHermite(interpolationPoints: annotationPoints)
+            }
+            renderToImage()
+            setNeedsDisplay()
+            delegate?.didEndDrawLine(bezierPath: annotationPath, page: page)
+            clear()
+        }
+        pdfViewManager.touchState = .inactive
     }
     
 }

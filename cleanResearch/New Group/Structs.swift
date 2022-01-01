@@ -49,6 +49,7 @@ struct LocalFile {
     var uploaded: Date?
     var size: String
     var saving: Bool
+    var views: Int64
 }
 
 struct PublicationFile {
@@ -65,6 +66,14 @@ struct PublicationFile {
     var author: String?
     var journal: String?
     var groups: [String?]
+}
+
+struct FastFolderContent {
+    var files: [[LocalFile]]
+    var folder: String
+    var subfolders: [String]
+    var mainURL: URL
+    var folderLevel: Int
 }
 
 struct ProjectFile {
@@ -93,6 +102,31 @@ struct DownloadingFile {
     var category: Int
 }
 
+struct FolderStructure {
+    var categories = [String]()
+    var mainFolders = [[String]]()
+    var subFolders = [[[String]]]()
+    var mainURL = [[URL]]()
+    var subURL = [[[URL]]]()
+}
+
+struct SelectedFolder {
+    var category: String!
+    var categoryNumber: Int!
+    var mainFolderNumber: Int?
+    var mainFolderName: String!
+    var subFolderNumber: Int?
+    var subFolderName: String?
+    var filename: String?
+    var folderLevel: Int!
+    var tableNumber: Int!
+}
+
+struct ListTable {
+    var main = [String]()
+    var sub = [String]()
+}
+
 struct SelectedFile {
     var category: String?
     var filename: String?
@@ -105,4 +139,47 @@ struct BookmarkFile {
     var category: String
     var lastPageVisited: Int32?
     var page: [Int]?
+    var label: [String]?
+}
+
+struct SearchResult {
+    var files: [LocalFile]
+    var title: String
+}
+
+enum categories {
+    case recently
+    case search
+    case publications
+    case books
+    case economy
+    case manuscripts
+    case presentations
+    case proposals
+    case supervision
+    case teaching
+    case patents
+    case courses
+    case meetings
+    case conferences
+    case reviews
+    case workDocuments
+    case travel
+    case notes
+    case miscellaneous
+    case readingList
+    case memos
+    case settings
+    case bulletinBoard
+}
+
+struct SelectedScore {
+    var main: Int
+    var sub: Int
+    var value: Double
+}
+
+struct Grading {
+    var exam: Exams?
+    var score: Student?
 }

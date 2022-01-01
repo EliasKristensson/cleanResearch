@@ -39,11 +39,30 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var travelURL: URL?
     var notesURL: URL?
     var miscellaneousURL: URL?
+    var reportsURL: URL?
+    var projectsURL: URL?
     var docsDir: URL?
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplicationLaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
         
+        
+        //REMOVE EXTRA PADDING IN TABLEVIEW (FOR IOS 15)
+        if #available(iOS 15.0, *) {
+            UITableView.appearance().sectionHeaderTopPadding = 0.0
+        }
+        
+        
+//        //FIX PROBLEM WITH TRANSPARENT NAVIGATION BAR
+//        if #available(iOS 15, *) {
+//            let appearance = UINavigationBarAppearance()
+//            appearance.configureWithOpaqueBackground()
+//            appearance.backgroundColor = UIColor(red: 0.0/255.0, green: 0.0/255.0, blue: 0.0/255.0, alpha: 1.0)
+//            UINavigationBar.appearance().standardAppearance = appearance
+//            UINavigationBar.appearance().scrollEdgeAppearance = appearance
+//        }
+
+
         CKContainer.default().accountStatus{ status, error in
             guard status == .available else {
                 print("Icloud is not available")
@@ -79,6 +98,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         travelURL = docURL?.appendingPathComponent("Travel", isDirectory: true)
         notesURL = docURL?.appendingPathComponent("Notes", isDirectory: true)
         miscellaneousURL = docURL?.appendingPathComponent("Miscellaneous", isDirectory: true)
+        reportsURL = docURL?.appendingPathComponent("Reports", isDirectory: true)
+        projectsURL = docURL?.appendingPathComponent("Projects", isDirectory: true)
         
         if iCloudURL != nil {
             // Create folders under iCloud Drive/cleanResearch/...
@@ -172,6 +193,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             } catch let error as NSError {
                 print(error.localizedDescription);
             }
+            do {
+                try FileManager.default.createDirectory(at: reportsURL!, withIntermediateDirectories: false, attributes: nil)
+            } catch let error as NSError {
+                print(error.localizedDescription);
+            }
+            do {
+                try FileManager.default.createDirectory(at: projectsURL!, withIntermediateDirectories: false, attributes: nil)
+            } catch let error as NSError {
+                print(error.localizedDescription);
+            }
         } else {
             print("iCloud nil")
         }
@@ -253,11 +284,3 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 // Replace this implementation with code to handle the error appropriately.
 // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
 
-/*
- Typical reasons for an error here include:
- * The parent directory does not exist, cannot be created, or disallows writing.
- * The persistent store is not accessible, due to permissions or data protection when the device is locked.
- * The device is out of space.
- * The store could not be migrated to the current model version.
- Check the error message to determine what the actual problem was.
- */

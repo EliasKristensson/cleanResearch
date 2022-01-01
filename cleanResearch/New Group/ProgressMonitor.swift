@@ -40,19 +40,23 @@ class ProgressMonitor: UIView {
         self.textWidth = settings[1]*0.8
         
         if moveDownTimer != nil {
-            print("valid")
             if moveDownTimer.isValid {
                 self.moveDownTimer.invalidate()
             }
         }
         self.moveDownTimer = Timer.scheduledTimer(timeInterval: self.time-0.5, target: self, selector: #selector(moveDown), userInfo: nil, repeats: false)
         self.label.frame = CGRect(x: self.frame.size.width / 2 - textWidth/2, y: self.frame.size.height / 2 - textHeight/2, width: textWidth, height: textHeight)
+        
+        self.label.numberOfLines = 1
+        self.label.lineBreakMode = .byTruncatingTail
+        
         if displayText != nil {
             self.label.text = displayText
         } else {
             self.label.text = text
         }
         self.label.adjustsFontSizeToFitWidth = true
+        self.label.minimumScaleFactor = 0.6
         self.addSubview(label)
         moveUp()
     }
