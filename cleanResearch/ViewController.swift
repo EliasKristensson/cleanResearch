@@ -2918,8 +2918,13 @@ class ViewController: UIViewController, UIPopoverPresentationControllerDelegate,
     func setupNavigationBar() {
         extendedLayoutIncludesOpaqueBars = true
         self.navigationItem.hidesBackButton = true
-        self.navigationController?.navigationBar.backgroundColor = UIColor.black
-        self.navigationController?.navigationBar.tintColor = UIColor.white
+        
+        navigationController?.isNavigationBarHidden = false
+        navigationController?.navigationBar.isTranslucent = false
+        navigationController?.navigationBar.backgroundColor = UIColor.white
+
+//        navigationController?.setStatusBar(backgroundColor: .black)
+
     }
     
     func sortFiles() {
@@ -5379,6 +5384,8 @@ extension ViewController: ExpenseCellDelegate {
 }
 
 
+
+
 @IBDesignable extension UIButton {
     
     @IBInspectable var borderWidth: CGFloat {
@@ -5480,3 +5487,5 @@ extension ViewController: ExpenseCellDelegate {
     }
 
 }
+
+

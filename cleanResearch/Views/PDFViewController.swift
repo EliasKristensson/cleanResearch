@@ -688,10 +688,12 @@ class PDFViewController: UIViewController, UISearchBarDelegate, UIPencilInteract
         initialLoad = true
         
         navigationController?.isNavigationBarHidden = false
+        navigationController?.navigationBar.isTranslucent = false
+        
         navigationController?.navigationBar.barTintColor = UIColor.white
         navigationController?.navigationBar.tintColor = UIColor.black
-        navigationController?.navigationBar.isTranslucent = false
         navigationController?.navigationBar.backgroundColor = UIColor(red: 255.0/255.0, green: 255.0/255.0, blue: 255.0/255.0, alpha: 1)
+//        navigationController?.setStatusBar(backgroundColor: .white)
         
         pdfView.document = document
         document.delegate = self

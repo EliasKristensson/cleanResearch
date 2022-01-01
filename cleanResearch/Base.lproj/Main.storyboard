@@ -1592,7 +1592,7 @@ All recently viewed files will be displayed at the top category, sorted either a
                             </searchBar>
                         </subviews>
                         <viewLayoutGuide key="safeArea" id="6Tk-OE-BBY"/>
-                        <color key="backgroundColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                        <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                         <color key="tintColor" white="0.0" alpha="0.0" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                         <userDefinedRuntimeAttributes>
                             <userDefinedRuntimeAttribute type="color" keyPath="startColor">
@@ -1614,7 +1614,7 @@ All recently viewed files will be displayed at the top category, sorted either a
                     <navigationItem key="navigationItem" largeTitleDisplayMode="never" id="7SW-pE-cyu">
                         <leftBarButtonItems>
                             <barButtonItem image="plus" catalog="system" id="z4i-dw-LRq">
-                                <color key="tintColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                <color key="tintColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                 <connections>
                                     <action selector="addNewGroup:" destination="BYZ-38-t0r" id="L6P-hW-HsT"/>
                                 </connections>
@@ -1623,23 +1623,24 @@ All recently viewed files will be displayed at the top category, sorted either a
                                 <segmentedControl key="customView" opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="left" contentVerticalAlignment="top" apportionsSegmentWidthsByContent="YES" segmentControlStyle="bar" selectedSegmentIndex="0" id="sML-uG-bU1">
                                     <rect key="frame" x="61" y="9" width="301" height="33"/>
                                     <autoresizingMask key="autoresizingMask" flexibleMinX="YES" widthSizable="YES" flexibleMaxX="YES" flexibleMinY="YES" flexibleMaxY="YES"/>
-                                    <color key="backgroundColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                    <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                     <segments>
                                         <segment title="Projects"/>
                                         <segment title="Invoices"/>
                                         <segment title="Grants"/>
                                     </segments>
-                                    <color key="tintColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
-                                    <color key="selectedSegmentTintColor" systemColor="systemGray4Color"/>
+                                    <color key="tintColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                    <color key="selectedSegmentTintColor" systemColor="systemGray2Color"/>
                                     <connections>
                                         <action selector="optionsChangedValue:" destination="BYZ-38-t0r" eventType="valueChanged" id="Pfg-8y-p3G"/>
                                     </connections>
                                 </segmentedControl>
+                                <color key="tintColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                             </barButtonItem>
                         </leftBarButtonItems>
                         <rightBarButtonItems>
                             <barButtonItem title="Item" image="Sort" id="cdc-1h-jkE">
-                                <color key="tintColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                <color key="tintColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                 <connections>
                                     <action selector="sortCV:" destination="BYZ-38-t0r" id="tDu-pk-S4a"/>
                                     <segue destination="HmS-W6-htN" kind="popoverPresentation" identifier="segueSortCV" popoverAnchorBarButtonItem="cdc-1h-jkE" id="7h3-Fl-wfg">
@@ -1648,31 +1649,31 @@ All recently viewed files will be displayed at the top category, sorted either a
                                 </connections>
                             </barButtonItem>
                             <barButtonItem title="Item" image="star" id="Wer-iZ-PZh">
-                                <color key="tintColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                <color key="tintColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                 <connections>
                                     <action selector="favoriteTapped:" destination="BYZ-38-t0r" id="rVJ-Nb-WkN"/>
                                 </connections>
                             </barButtonItem>
                             <barButtonItem image="glasses" id="EpR-bX-F5P">
-                                <color key="tintColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                <color key="tintColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                 <connections>
                                     <action selector="readingListTapped:" destination="BYZ-38-t0r" id="WwR-C4-K1r"/>
                                 </connections>
                             </barButtonItem>
                             <barButtonItem title="Item" image="DownloadPDF" id="wU5-ol-oUG">
-                                <color key="tintColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                <color key="tintColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                 <connections>
                                     <action selector="downloadToLocalFileTapped:" destination="BYZ-38-t0r" id="byC-47-VOD"/>
                                 </connections>
                             </barButtonItem>
                             <barButtonItem title="Item" image="Edit" id="Zzc-b2-IQC">
-                                <color key="tintColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                <color key="tintColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                 <connections>
                                     <action selector="editIconTapped:" destination="BYZ-38-t0r" id="9rR-dg-cqB"/>
                                 </connections>
                             </barButtonItem>
                             <barButtonItem title="Item" image="task" id="P1C-Yi-jcq">
-                                <color key="tintColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                <color key="tintColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                 <connections>
                                     <segue destination="BmD-f0-DrE" kind="popoverPresentation" identifier="segueNotes" popoverAnchorBarButtonItem="P1C-Yi-jcq" id="oaH-P8-dPG">
                                         <popoverArrowDirection key="popoverArrowDirection" up="YES" down="YES" left="YES" right="YES"/>
@@ -1680,19 +1681,19 @@ All recently viewed files will be displayed at the top category, sorted either a
                                 </connections>
                             </barButtonItem>
                             <barButtonItem image="SearchProperty" id="KZb-8s-T08">
-                                <color key="tintColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                <color key="tintColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                 <connections>
                                     <action selector="searchButtonTapped:" destination="BYZ-38-t0r" id="Ytj-Vn-ljG"/>
                                 </connections>
                             </barButtonItem>
                             <barButtonItem image="BookmarksgridMainVC" id="3HE-95-Yhg">
-                                <color key="tintColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                <color key="tintColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                 <connections>
                                     <segue destination="IA6-Ca-V2F" kind="presentation" identifier="bookmarkSegue" modalPresentationStyle="overCurrentContext" modalTransitionStyle="crossDissolve" id="axo-QG-czv"/>
                                 </connections>
                             </barButtonItem>
                             <barButtonItem image="push-pin" id="5NI-bA-m2f">
-                                <color key="tintColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                <color key="tintColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                 <connections>
                                     <segue destination="bcq-gW-q7i" kind="popoverPresentation" identifier="bulletinListSegue" popoverAnchorBarButtonItem="5NI-bA-m2f" id="5Da-y7-Stf">
                                         <popoverArrowDirection key="popoverArrowDirection" up="YES" down="YES" left="YES" right="YES"/>
@@ -1928,7 +1929,7 @@ All recently viewed files will be displayed at the top category, sorted either a
         <!--View Controller-->
         <scene sceneID="Utg-Ro-7tQ">
             <objects>
-                <viewController wantsFullScreenLayout="YES" extendedLayoutIncludesOpaqueBars="YES" interfaceStyle="light" id="aJ4-PZ-Tdz" customClass="PDFViewController" customModule="cleanResearch" customModuleProvider="target" sceneMemberID="viewController">
+                <viewController wantsFullScreenLayout="YES" extendedLayoutIncludesOpaqueBars="YES" id="aJ4-PZ-Tdz" customClass="PDFViewController" customModule="cleanResearch" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="UOt-IM-6hM">
                         <rect key="frame" x="0.0" y="0.0" width="1194" height="834"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
@@ -2468,6 +2469,7 @@ All recently viewed files will be displayed at the top category, sorted either a
                             </userDefinedRuntimeAttribute>
                         </userDefinedRuntimeAttributes>
                     </view>
+                    <extendedEdge key="edgesForExtendedLayout" top="YES"/>
                     <toolbarItems/>
                     <navigationItem key="navigationItem" largeTitleDisplayMode="never" id="7l1-T0-IxP">
                         <nil key="title"/>
@@ -2556,7 +2558,7 @@ All recently viewed files will be displayed at the top category, sorted either a
                             </barButtonItem>
                         </rightBarButtonItems>
                     </navigationItem>
-                    <simulatedNavigationBarMetrics key="simulatedTopBarMetrics" barStyle="black" translucent="NO" prompted="NO"/>
+                    <simulatedNavigationBarMetrics key="simulatedTopBarMetrics" translucent="NO" prompted="NO"/>
                     <nil key="simulatedBottomBarMetrics"/>
                     <connections>
                         <outlet property="addTextButton" destination="i0d-r5-CBO" id="E3f-uH-X2R"/>
@@ -3460,8 +3462,8 @@ All recently viewed files will be displayed at the top category, sorted either a
         </scene>
     </scenes>
     <inferredMetricsTieBreakers>
-        <segue reference="Adb-0q-Vj0"/>
-        <segue reference="34S-en-353"/>
+        <segue reference="W7x-ew-fmw"/>
+        <segue reference="oaH-P8-dPG"/>
     </inferredMetricsTieBreakers>
     <resources>
         <image name="AddText" width="25" height="25"/>
@@ -3549,8 +3551,8 @@ All recently viewed files will be displayed at the top category, sorted either a
         <systemColor name="systemBlueColor">
             <color red="0.0" green="0.47843137254901963" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
         </systemColor>
-        <systemColor name="systemGray4Color">
-            <color red="0.81960784313725488" green="0.81960784313725488" blue="0.83921568627450982" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+        <systemColor name="systemGray2Color">
+            <color red="0.68235294117647061" green="0.68235294117647061" blue="0.69803921568627447" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
         </systemColor>
         <systemColor name="systemGray5Color">
             <color red="0.89803921568627454" green="0.89803921568627454" blue="0.91764705882352937" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
